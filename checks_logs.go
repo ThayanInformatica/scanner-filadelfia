@@ -89,11 +89,17 @@ func checarLogsDeEventos(c *Contexto) {
 	} else if len(limpezasSistema) == 0 {
 		r.Ok("Nenhum registro de limpeza de logs do sistema (evento 104)")
 	}
+	limpezasVistas := map[string]bool{}
 	for _, e := range limpezasSistema {
 		canal := e.Dados["Channel"]
 		if canal == "" {
 			canal = "?"
 		}
+		chaveLimpeza := canal + "|" + e.Hora.Format(time.RFC3339)
+		if limpezasVistas[chaveLimpeza] {
+			continue
+		}
+		limpezasVistas[chaveLimpeza] = true
 		sev := Critico
 		nota := ""
 		if !e.Hora.IsZero() && time.Since(e.Hora) > 60*24*time.Hour {
@@ -136,6 +142,9 @@ func checarLogsDeEventos(c *Contexto) {
 			r.Add(Critico, "Log '"+nome+"' esta VAZIO", "Um log principal nunca fica vazio em um Windows em uso")
 			continue
 		}
+		if strings.Contains(nome, "PowerShell") {
+			continue
+		}
 		if !maisAntigo.IsZero() && !c.Instalacao.IsZero() && time.Since(c.Instalacao) > 72*time.Hour && time.Since(maisAntigo) < 48*time.Hour {
 			r.Add(Alerta, fmt.Sprintf("Log '%s' so tem eventos das ultimas %s", nome, time.Since(maisAntigo).Round(time.Hour)), fmt.Sprintf("Windows instalado em %s. Pode ser limpeza ou rotacao por tamanho (limite %d MB, %d registros)", formataHora(c.Instalacao), tamanhoMax/1024/1024, registros))
 		}
@@ -176,7 +185,11 @@ func checarLogsDeEventos(c *Contexto) {
 			}
 			img := strings.ToLower(imagem)
 			if strings.Contains(strings.ToLower(tipo), "kernel") && !strings.Contains(img, "\\windows\\") && !strings.Contains(img, "\\systemroot\\") && !strings.HasPrefix(strings.TrimLeft(img, "\\"), "system32\\") && !strings.HasPrefix(img, "\\??\\c:\\windows") && !strings.Contains(img, "\\program files") {
-				r.Add(Alerta, "Driver de kernel instalado fora das pastas do sistema: "+nome, linha)
+				if strings.Contains(img, `\cpuid software\`) || strings.Contains(img, `\cpuid\`) {
+					r.Add(Info, "Driver do CPU-Z/HWMonitor instalado com nome aleatorio: "+nome, linha+"\nA CPUID gera um nome novo a cada instalacao. E o comportamento normal do CPU-Z, HWMonitor e afins")
+				} else {
+					r.Add(Alerta, "Driver de kernel instalado fora das pastas do sistema: "+nome, linha)
+				}
 				continue
 			}
 			linhas = append(linhas, linha)

@@ -9,8 +9,6 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"regexp"
-	"strconv"
 	"strings"
 	"time"
 
@@ -32,15 +30,23 @@ func checarJournalDoDisco(c *Contexto) {
 		total := 0
 		inicio := time.Now()
 		args := []string{"usn", "readjournal", letra, "csv"}
-		if inicioUSN := usnRecente(letra); inicioUSN > 0 {
+		inicioUSN := usnRecente(letra)
+		if inicioUSN > 0 {
 			args = []string{"usn", "readjournal", letra, fmt.Sprintf("startusn=%d", inicioUSN), "csv"}
 		}
 		const tetoDeRegistros = 40000000
-		err := executarStreamCancelavel(c.LimiteEtapa, c.DevePular, func(saida io.Reader) error {
-			var err error
-			eventos, total, err = lerUSNCsv(saida, tetoDeRegistros, interessa)
-			return err
-		}, "fsutil", args...)
+		ler := func(argumentos []string) error {
+			return executarStreamCancelavel(c.LimiteEtapa, c.DevePular, func(saida io.Reader) error {
+				var err error
+				eventos, total, err = lerUSNCsv(saida, tetoDeRegistros, interessa)
+				return err
+			}, "fsutil", argumentos...)
+		}
+		err := ler(args)
+		if err == nil && inicioUSN > 0 && total < 100 {
+			r.Linha("Journal de %s: leitura a partir do USN recente trouxe so %d registros, lendo o journal inteiro", letra, total)
+			err = ler([]string{"usn", "readjournal", letra, "csv"})
+		}
 		switch {
 		case err == errCancelado:
 			r.Linha("Journal de %s: leitura interrompida a pedido com %d registros lidos", letra, total)
@@ -63,37 +69,12 @@ func checarJournalDoDisco(c *Contexto) {
 	}
 }
 
-var reProximaUSN = regexp.MustCompile(`(?i)(next usn|pr.xima usn|usn seguinte)\s*:\s*(0x[0-9a-f]+|\d+)`)
-
 func usnRecente(volume string) uint64 {
 	saida, err := executar("fsutil", "usn", "queryjournal", volume)
 	if err != nil {
 		return 0
 	}
-	m := reProximaUSN.FindStringSubmatch(saida)
-	if m == nil {
-		return 0
-	}
-	texto := strings.ToLower(m[2])
-	var proxima uint64
-	if strings.HasPrefix(texto, "0x") {
-		v, err := strconv.ParseUint(texto[2:], 16, 64)
-		if err != nil {
-			return 0
-		}
-		proxima = v
-	} else {
-		v, err := strconv.ParseUint(texto, 10, 64)
-		if err != nil {
-			return 0
-		}
-		proxima = v
-	}
-	const janela = 400 * 1024 * 1024
-	if proxima > janela {
-		return proxima - janela
-	}
-	return 0
+	return pontoDePartidaUSN(saida, 400*1024*1024)
 }
 
 func limiteOuPadrao(limite, padrao time.Duration) time.Duration {

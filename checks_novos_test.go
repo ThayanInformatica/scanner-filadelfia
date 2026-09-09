@@ -205,7 +205,7 @@ func TestConteudoDetectaStringEmExeEScript(t *testing.T) {
 	os.WriteFile(filepath.Join(dir, "Downloads", "update.exe"), exe, 0o644)
 	os.WriteFile(filepath.Join(dir, "Documents", "script.lua"), []byte("-- dumped with eulen\nlocal x = 1"), 0o644)
 	os.WriteFile(filepath.Join(dir, "Documents", "receita.txt"), []byte("bolo de cenoura com cobertura"), 0o644)
-	os.WriteFile(filepath.Join(dir, "Documents", "scanner-relatorio.txt"), []byte("eulen redengine susano"), 0o644)
+	os.WriteFile(filepath.Join(dir, "Documents", "scanner-PC-20260909-195039.txt"), []byte("eulen redengine susano"), 0o644)
 	os.WriteFile(filepath.Join(dir, "Documents", "foto.jpg"), []byte("eulen dentro de imagem"), 0o644)
 
 	a := assinaturasDeTeste(t)
@@ -220,7 +220,7 @@ func TestConteudoDetectaStringEmExeEScript(t *testing.T) {
 	if !temAchado(r, Critico, "script.lua") {
 		t.Errorf("nao detectou eulen no lua: %+v", r.Achados)
 	}
-	for _, proibido := range []string{"receita.txt", "scanner-relatorio.txt", "foto.jpg"} {
+	for _, proibido := range []string{"receita.txt", "scanner-PC-20260909-195039.txt", "foto.jpg"} {
 		if temAchado(r, Critico, proibido) || temAchado(r, Alerta, proibido) {
 			t.Errorf("%s nao devia ser flagrado: %+v", proibido, r.Achados)
 		}

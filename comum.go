@@ -289,12 +289,76 @@ func arquivoDoUniversoDoJogo(nome string) string {
 			return ""
 		}
 	}
-	for _, marca := range []string{"citizen", "fivem", "cfx", "gta", "rage", "scripthook", "asi", "dinput8", "d3d11", "dxgi", "openiv", "rph", "ragehook"} {
+	if strings.HasSuffix(n, ".asi") {
+		return "asi"
+	}
+	for _, marca := range []string{"fivem", "citizen", "gtav", "gta5", "scripthook", "ragemp", "ragehook", "ragepluginhook", "dinput8", "d3d11", "dxgi", "openiv"} {
 		if strings.Contains(n, marca) {
 			return marca
 		}
 	}
+	if m := reMarcaCurtaDoJogo.FindStringSubmatch(n); m != nil {
+		return m[2]
+	}
 	return ""
+}
+
+var reMarcaCurtaDoJogo = regexp.MustCompile(`(^|[^a-z0-9])(gta|rage|cfx|rph)([^a-z0-9]|$)`)
+
+func paiDoCaminho(caminho string) string {
+	i := strings.LastIndexAny(caminho, `\/`)
+	if i <= 0 {
+		return ""
+	}
+	return caminho[:i]
+}
+
+func recursoDeServidorFiveM(caminho string, existe func(string) bool) bool {
+	lower := strings.ToLower(caminho)
+	if !strings.Contains(lower, `\resources\`) && !strings.Contains(lower, `/resources/`) {
+		return false
+	}
+	pasta := paiDoCaminho(caminho)
+	for i := 0; i < 4 && pasta != ""; i++ {
+		sep := `\`
+		if !strings.Contains(pasta, `\`) {
+			sep = "/"
+		}
+		if existe(pasta+sep+"fxmanifest.lua") || existe(pasta+sep+"__resource.lua") {
+			return true
+		}
+		pasta = paiDoCaminho(pasta)
+	}
+	return false
+}
+
+var marcasDeRelatorioDoScanner = []string{
+	"bate com assinatura", "[critico]", "[alerta]", "scanner filadelfia", "nenhuma placa dma",
+	"drivers mapeados manualmente", "indicios fortes de trapaca", "nenhum indicio forte", "etapa pulada a pedido",
+	"varredura incompleta", "o scanner abriu o pacote",
+}
+
+func contextoDeRelatorioDoScanner(texto string) bool {
+	lower := strings.ToLower(texto)
+	for _, m := range marcasDeRelatorioDoScanner {
+		if strings.Contains(lower, m) {
+			return true
+		}
+	}
+	return false
+}
+
+var reArquivoDeRelatorioDoScanner = regexp.MustCompile(`(?i)^scanner-.+-\d{8}-\d{4,6}\.(txt|json)$`)
+
+func arquivoDeRelatorioDoScanner(nome string) bool {
+	if i := strings.LastIndexAny(nome, `\/`); i >= 0 {
+		nome = nome[i+1:]
+	}
+	return reArquivoDeRelatorioDoScanner.MatchString(nome)
+}
+
+func dentroDeSteamApps(caminho string) bool {
+	return strings.Contains(strings.ToLower(caminho), `\steamapps\common\`)
 }
 
 func contaDeServicoDoWindows(usuario string) bool {

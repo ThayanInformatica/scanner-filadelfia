@@ -27,6 +27,7 @@ var extensoesExecutaveisOuScripts = map[string]bool{
 }
 
 var trechosIgnoradosNoConteudo = []string{
+	`\perl\lib\unicore\`, `\postgres\data\`, `\postgresql\data\`, `\pgsql\data\`, `\pg_data\`,
 	`\google\chrome\`, `\microsoft\edge\`, `\bravesoftware\`, `\vivaldi\`, `\opera software\`, `\mozilla\firefox\`,
 	`\discord\`, `\discordcanary\`, `\discordptb\`, `\fivem\fivem.app\data\cache\`, `\fivem\fivem.app\citizen\`,
 	`\fivem\fivem.app\bin\`, `\node_modules\`, `\.git\`, `\steam\steamapps\`, `\epic games\`, `\rockstar games\`,
@@ -53,7 +54,7 @@ type resultadoConteudo struct {
 func ignorarNoConteudo(caminho string, a *Assinaturas) bool {
 	lower := strings.ToLower(caminho)
 	base := filepath.Base(lower)
-	if strings.HasPrefix(base, "scanner") || base == "assinaturas.json" {
+	if arquivoDeRelatorioDoScanner(base) || base == "assinaturas.json" || base == "assinaturas.exemplo.json" || ehOProprioScanner(caminho, 0) {
 		return true
 	}
 	for _, t := range trechosIgnoradosNoConteudo {
@@ -204,9 +205,17 @@ func relatarConteudo(c *Contexto, res resultadoConteudo) {
 		emitidos++
 		sev := Alerta
 		tipo := "Arquivo"
+		nota := ""
 		if extensoesExecutaveisOuScripts[a.Extensao] {
 			sev = Critico
 			tipo = "Executavel/script"
+		}
+		if recursoDeServidorFiveM(a.Caminho, existe) {
+			sev = Alerta
+			nota = "\nEsta dentro de um recurso de servidor FiveM (tem fxmanifest.lua). Script de anticheat e de administracao cita nome de cheat por natureza. Vale olhar, mas nao e o padrao de cheat, que fica solto em Downloads ou Temp"
+		} else if dentroDeSteamApps(a.Caminho) && !extensoesExecutaveisOuScripts[a.Extensao] {
+			sev = Info
+			nota = "\nArquivo de dados de um jogo da Steam. Palavra coincidente em texto de jogo, quase sempre"
 		}
 		titulo := fmt.Sprintf("%s contem string '%s'", tipo, a.Termos[0])
 		if len(a.Termos) > 1 {
@@ -217,7 +226,7 @@ func relatarConteudo(c *Contexto, res resultadoConteudo) {
 		if a.Contexto != "" {
 			detalhe += "\n..." + a.Contexto + "..."
 		}
-		r.Add(sev, titulo, detalhe)
+		r.Add(sev, titulo, detalhe+nota)
 	}
 	if len(restantes) > 0 {
 		r.Add(Alerta, fmt.Sprintf("Mais %d arquivo(s) com strings de cheat", len(restantes)), strings.Join(limitaLinhas(restantes, 160), "\n"))

@@ -4,7 +4,9 @@ import (
 	"encoding/csv"
 	"fmt"
 	"io"
+	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -58,6 +60,9 @@ func lerUSNCsv(r io.Reader, maxLinhas int, interessa func(nome string) bool) ([]
 			break
 		}
 		if err != nil {
+			continue
+		}
+		if len(linha) < 3 {
 			continue
 		}
 		if cabecalho == nil {
@@ -207,4 +212,36 @@ type ResultadoBuscaLivre struct {
 
 func (r ResultadoBuscaLivre) Vazio() bool {
 	return len(r.Arquivos) == 0 && len(r.Registro) == 0 && len(r.Memoria) == 0 && len(r.Journal) == 0
+}
+
+var reProximaUSN = regexp.MustCompile(`(?i)(next usn|pr.xim[ao] usn|usn seguinte)\s*:\s*(0x[0-9a-f]+|\d+)`)
+
+var rePrimeiraUSN = regexp.MustCompile(`(?i)(first usn|primeir[ao] usn|usn inicial)\s*:\s*(0x[0-9a-f]+|\d+)`)
+
+func numeroUSN(texto string) uint64 {
+	texto = strings.ToLower(strings.TrimSpace(texto))
+	if strings.HasPrefix(texto, "0x") {
+		v, _ := strconv.ParseUint(texto[2:], 16, 64)
+		return v
+	}
+	v, _ := strconv.ParseUint(texto, 10, 64)
+	return v
+}
+
+func pontoDePartidaUSN(saidaQueryJournal string, janela uint64) uint64 {
+	m := reProximaUSN.FindStringSubmatch(saidaQueryJournal)
+	if m == nil {
+		return 0
+	}
+	proxima := numeroUSN(m[2])
+	inicio := uint64(0)
+	if proxima > janela {
+		inicio = proxima - janela
+	}
+	if f := rePrimeiraUSN.FindStringSubmatch(saidaQueryJournal); f != nil {
+		if primeira := numeroUSN(f[2]); primeira > inicio {
+			inicio = primeira
+		}
+	}
+	return inicio
 }

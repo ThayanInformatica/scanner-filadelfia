@@ -334,6 +334,8 @@ func checarDrivers(c *Contexto) {
 		case classe != SemMatch:
 			problemas++
 			r.Add(Critico, "Driver carregado bate com assinatura '"+termo+"': "+base, d)
+		case foraDoSistema && (strings.Contains(lower, `\cpuid software\`) || strings.Contains(lower, `\cpuid\`)):
+			r.Add(Info, "Driver do CPU-Z/HWMonitor com nome aleatorio: "+base, d+"\nA CPUID gera um nome novo a cada instalacao. Comportamento normal do CPU-Z e do HWMonitor")
 		case foraDoSistema:
 			problemas++
 			r.Add(Alerta, "Driver carregado de pasta fora do sistema: "+base, d)

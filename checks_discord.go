@@ -157,13 +157,21 @@ func relatarDiscord(c *Contexto, usuario, nome, raiz string) {
 
 	porTermo := map[string][]achadoDiscord{}
 	var termos []string
+	relatoriosColados := 0
 	for _, m := range res.Mencoes {
+		if contextoDeRelatorioDoScanner(m.Contexto) {
+			relatoriosColados++
+			continue
+		}
 		if _, ok := porTermo[m.Termo]; !ok {
 			termos = append(termos, m.Termo)
 		}
 		porTermo[m.Termo] = append(porTermo[m.Termo], m)
 	}
 	sort.Strings(termos)
+	if relatoriosColados > 0 {
+		r.Linha("%d trecho(s) do cache eram relatorio deste scanner colado no Discord, ignorados", relatoriosColados)
+	}
 	for _, t := range termos {
 		lista := porTermo[t]
 		var linhas []string

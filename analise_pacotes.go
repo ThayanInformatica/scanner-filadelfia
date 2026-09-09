@@ -98,6 +98,14 @@ func avaliarPacote(p PacoteAnalisado, a *Assinaturas) []Sinal {
 
 	sort.Strings(perigosos)
 	doJogo := arquivoDoUniversoDoJogo(nomeBase(p.Caminho)) != ""
+	if len(perigosos) > 0 && soManifestoDeRecurso(p.Itens) {
+		sinais = append(sinais, Sinal{Info, fmt.Sprintf("%s e um recurso de servidor FiveM (so tem fxmanifest.lua de script)", nomeBase(p.Caminho)), p.Caminho + "\n" + strings.Join(limitaLinhas(perigosos, 20), "\n") + "\nfxmanifest.lua e o arquivo de descricao de recurso de servidor, nao e programa. Pacote de mod de carro, mapa ou roupa vem assim", ""})
+		perigosos = nil
+	}
+	if len(perigosos) > 0 && modGraficoConhecido(p.Caminho, p.Itens) {
+		sinais = append(sinais, Sinal{Alerta, fmt.Sprintf("%s e um mod grafico conhecido com %d programa(s) dentro", nomeBase(p.Caminho), len(perigosos)), p.Caminho + "\n" + strings.Join(limitaLinhas(perigosos, 40), "\n") + "\nQuantV, NaturalVision, ReShade e ENB funcionam com dxgi.dll, d3d11.dll ou plugin .asi: e o mecanismo normal deles, nao e cheat. Mas qualquer uma dessas dll pode ter sido trocada, entao vale conferir a assinatura ou o hash contra o pacote original", "suspeito"})
+		perigosos = nil
+	}
 	if len(perigosos) > 0 && !(len(perigosos) == 1 && !doJogo && len(p.Itens) <= 12) {
 		sev := Alerta
 		nota := "\nPacote de mod visual normalmente so tem .rpf, .ytd, .ydr, imagem e texto. Programa, dll, driver ou script dentro de um pacote de mod e o jeito mais comum de entregar cheat"
@@ -120,6 +128,66 @@ func avaliarPacote(p PacoteAnalisado, a *Assinaturas) []Sinal {
 		sinais = append(sinais, Sinal{Info, fmt.Sprintf("Conteudo de %s: %d arquivo(s), nada suspeito", nomeBase(p.Caminho), len(p.Itens)), p.Caminho + "\n" + strings.Join(limitaLinhas(todos, 100), "\n"), ""})
 	}
 	return ordenaSinais(sinais)
+}
+
+var nomesDeModGrafico = []string{"quantv", "naturalvision", "nve", "reshade", "enb", "visualv", "redux", "fivem enhanced", "graphics"}
+
+var dllsDeModGrafico = map[string]bool{
+	"dxgi.dll": true, "d3d11.dll": true, "d3d12.dll": true, "d3d9.dll": true, "d3d10.dll": true, "opengl32.dll": true,
+	"dinput8.dll": true, "reshade64.dll": true, "reshade32.dll": true, "enbseries.dll": true, "enblocal.dll": true,
+}
+
+func modGraficoConhecido(caminhoDoPacote string, itens []ItemDePacote) bool {
+	nomePacote := strings.ToLower(nomeBase(caminhoDoPacote))
+	temMarca := false
+	for _, m := range nomesDeModGrafico {
+		if strings.Contains(nomePacote, m) {
+			temMarca = true
+			break
+		}
+	}
+	if !temMarca {
+		return false
+	}
+	for _, item := range itens {
+		base := strings.ToLower(nomeBase(item.Nome))
+		ext := path.Ext(base)
+		if extensoesPerigosasEmPacote[ext] == "" || extensaoDeTexto(base) {
+			continue
+		}
+		if dllsDeModGrafico[base] {
+			continue
+		}
+		if ext == ".asi" {
+			ok := false
+			for _, m := range nomesDeModGrafico {
+				if strings.Contains(base, m) {
+					ok = true
+					break
+				}
+			}
+			if ok {
+				continue
+			}
+		}
+		return false
+	}
+	return true
+}
+
+func soManifestoDeRecurso(itens []ItemDePacote) bool {
+	perigosos := 0
+	for _, item := range itens {
+		base := strings.ToLower(nomeBase(item.Nome))
+		if extensoesPerigosasEmPacote[path.Ext(base)] == "" || extensaoDeTexto(base) {
+			continue
+		}
+		if base != "fxmanifest.lua" && base != "__resource.lua" {
+			return false
+		}
+		perigosos++
+	}
+	return perigosos > 0
 }
 
 func nomesDentroDoRarPorTexto(dados []byte, maxItens int) []ItemDePacote {
@@ -168,8 +236,12 @@ var prefixosDoCitizenOficial = []string{
 	"citizen/", "citizen\\", "clr2/", "clr2\\", "resources/", "resources\\",
 }
 
+var pastasDoCitizenOficial = []string{
+	"citizen/scripting/", "citizen/shaderz/", "citizen/clr2/", "citizen/dui/", "citizen/ui/", "citizen/common/", "citizen/platform/",
+}
+
 var arquivosDoCitizenOficial = []string{
-	"citizenfx.core", "mono.", "microsoft.csharp", "msgpack", "system.", "mscorlib", "netstandard",
+	"citizenfx.", "mono.", "microsoft.csharp", "msgpack", "system.", "mscorlib", "netstandard",
 	"citizen-", "cfx-", "ros.dll", "botan", "cef", "libcef", "v8", "libuv", "steam_api", "discord",
 	"gta5_settings", "shaders", "scripting", "natives", "manifest", "fxmanifest", "__resource",
 }
@@ -194,6 +266,12 @@ func conteudoBateComFiveMOficial(itens []ItemDePacote) (bool, []string) {
 		}
 		base := nomeBase(item.Nome)
 		conhecido := false
+		for _, pasta := range pastasDoCitizenOficial {
+			if strings.Contains(nome, pasta) {
+				conhecido = true
+				break
+			}
+		}
 		for _, marca := range arquivosDoCitizenOficial {
 			if strings.Contains(strings.ToLower(base), marca) {
 				conhecido = true

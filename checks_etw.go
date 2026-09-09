@@ -54,6 +54,49 @@ func comandosDeCaptura(etl string) [][]string {
 	return [][]string{comBuffer, simples, porGUID}
 }
 
+func iniciarSessaoETW(etl string, aoVivo func(string)) (func(), error) {
+	var erros []string
+	registra := func(modo string, err error, saida string) {
+		erros = append(erros, fmt.Sprintf("%s: %v %s", modo, err, resume(paraUTF8(saida), 160)))
+	}
+
+	executar("logman", "stop", nomeSessaoScanner)
+	executar("logman", "delete", nomeSessaoScanner)
+	argsDCS := []string{"create", "trace", nomeSessaoScanner,
+		"-p", "Microsoft-Windows-Kernel-Process", "0x50", "win:Informational",
+		"-p", "Microsoft-Windows-DNS-Client", "0xffffffffffffffff", "win:Informational",
+		"-o", etl, "-f", "bincirc", "-max", "64", "-y"}
+	if saida, err := executar("logman", argsDCS...); err == nil {
+		if saidaStart, errStart := executar("logman", "start", nomeSessaoScanner); errStart == nil {
+			if aoVivo != nil {
+				aoVivo("Sessao do kernel iniciada como conjunto de coletores (logman start)")
+			}
+			return func() {
+				executar("logman", "stop", nomeSessaoScanner)
+				executar("logman", "delete", nomeSessaoScanner)
+			}, nil
+		} else {
+			registra("logman start", errStart, saidaStart)
+			executar("logman", "delete", nomeSessaoScanner)
+		}
+	} else {
+		registra("logman create (conjunto de coletores)", err, saida)
+	}
+
+	for i, args := range comandosDeCaptura(etl) {
+		saida, err := executar("logman", args...)
+		if err == nil {
+			if aoVivo != nil {
+				aoVivo(fmt.Sprintf("Sessao do kernel iniciada em tempo real (variante %d)", i+1))
+			}
+			return pararSessaoScanner, nil
+		}
+		registra(fmt.Sprintf("logman -ets variante %d", i+1), err, saida)
+		pararSessaoScanner()
+	}
+	return nil, fmt.Errorf("iniciar sessao ETW falhou em todas as formas:\n%s", strings.Join(erros, "\n"))
+}
+
 func capturarETW(duracao time.Duration, aoVivo func(string), cancelar func() bool) ([]EventoETW, error) {
 	pasta, err := os.MkdirTemp("", "scanner-etw-")
 	if err != nil {
@@ -64,21 +107,11 @@ func capturarETW(duracao time.Duration, aoVivo func(string), cancelar func() boo
 	xmlSaida := filepath.Join(pasta, "captura.xml")
 
 	pararSessaoScanner()
-	var ultimoErro error
-	iniciou := false
-	for i, args := range comandosDeCaptura(etl) {
-		saida, err := executar("logman", args...)
-		if err == nil {
-			iniciou = true
-			break
-		}
-		ultimoErro = fmt.Errorf("tentativa %d: %v %s", i+1, err, resume(paraUTF8(saida), 160))
-		pararSessaoScanner()
+	parar, err := iniciarSessaoETW(etl, aoVivo)
+	if err != nil {
+		return nil, err
 	}
-	if !iniciou {
-		return nil, fmt.Errorf("iniciar sessao ETW falhou nas 3 formas conhecidas. Ultima: %v", ultimoErro)
-	}
-	defer pararSessaoScanner()
+	defer parar()
 
 	fim := time.Now().Add(duracao)
 	marcadores := 0
@@ -94,17 +127,19 @@ func capturarETW(duracao time.Duration, aoVivo func(string), cancelar func() boo
 		marcadores++
 		time.Sleep(2 * time.Second)
 	}
-	if _, err := executar("logman", "stop", nomeSessaoScanner, "-ets"); err != nil {
-		return nil, fmt.Errorf("parar sessao ETW: %v", err)
-	}
+	parar()
 	if aoVivo != nil {
 		aoVivo("Convertendo a captura do kernel para leitura (tracerpt)")
 	}
 	if _, err := os.Stat(etl); err != nil {
 		gerados, _ := filepath.Glob(filepath.Join(pasta, "*.etl"))
 		if len(gerados) == 0 {
-			estado, _ := executar("logman", "query", nomeSessaoScanner, "-ets")
-			return nil, fmt.Errorf("a sessao rodou mas nao gravou arquivo em %s. Estado relatado pelo Windows: %s", pasta, resume(paraUTF8(estado), 300))
+			listagem, _ := os.ReadDir(pasta)
+			var nomes []string
+			for _, e := range listagem {
+				nomes = append(nomes, e.Name())
+			}
+			return nil, fmt.Errorf("a sessao rodou mas nao gravou .etl em %s (conteudo da pasta: %s)", pasta, strings.Join(nomes, ", "))
 		}
 		etl = gerados[0]
 	}
