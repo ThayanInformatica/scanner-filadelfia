@@ -315,7 +315,16 @@ func checarDrivers(c *Contexto) {
 		lower := strings.ToLower(d)
 		foraDoSistema := !strings.Contains(lower, `\systemroot\`) && !strings.Contains(lower, `\windows\`) && !strings.Contains(lower, `\program files`)
 		classe, termo := c.A.Classificar(base)
+		hashRotulo := ""
+		if arquivo := caminhoRealDoDriver(d); arquivo != "" {
+			if h := sha256DoArquivo(arquivo, 32*1024*1024); h != "" {
+				hashRotulo = c.A.HashConhecido(h)
+			}
+		}
 		switch {
+		case hashRotulo != "":
+			problemas++
+			r.Add(Critico, "Driver carregado com HASH conhecido: "+base, d+"\nBate com: "+hashRotulo+"\nHash de driver vulneravel ou malicioso da base publica. O nome pode ter sido trocado, o hash nao")
 		case c.A.DriverVulneravel(base) && foraDoSistema:
 			problemas++
 			r.Add(Critico, "Driver VULNERAVEL carregado de fora do sistema: "+base, d+"\nDriver da lista BYOVD carregado de pasta fora do Windows/Program Files. Padrao de mapeador de cheat")
@@ -336,4 +345,20 @@ func checarDrivers(c *Contexto) {
 	if problemas == 0 {
 		r.Ok("Nenhum driver vulneravel ou fora de lugar carregado. Drivers mapeados manualmente (kdmapper) nao aparecem nesta lista")
 	}
+}
+
+func caminhoRealDoDriver(caminho string) string {
+	lower := strings.ToLower(caminho)
+	raiz := os.Getenv("SystemRoot")
+	switch {
+	case strings.HasPrefix(lower, `\systemroot\`):
+		return filepath.Join(raiz, caminho[len(`\systemroot\`):])
+	case strings.HasPrefix(lower, `\??\`):
+		return caminho[4:]
+	case strings.HasPrefix(lower, `system32\`):
+		return filepath.Join(raiz, caminho)
+	case len(caminho) > 2 && caminho[1] == ':':
+		return caminho
+	}
+	return ""
 }

@@ -264,6 +264,12 @@ func checarArquivos(c *Contexto) {
 				return nil
 			}
 			if ext == ".sys" {
+				if h := sha256DoArquivo(caminho, 32*1024*1024); h != "" {
+					if rotulo := c.A.HashConhecido(h); rotulo != "" {
+						r.Add(Critico, "Driver com HASH conhecido no disco: "+d.Name(), caminho+"\nSHA256: "+h+"\nBate com: "+rotulo+"\nO hash nao muda quando o arquivo e renomeado")
+						return nil
+					}
+				}
 				if c.A.SysConhecidoDoSistema(d.Name()) || strings.Count(caminho, string(os.PathSeparator)) <= 1 {
 					return nil
 				}
