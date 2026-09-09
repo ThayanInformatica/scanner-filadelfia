@@ -15,6 +15,7 @@ type Contexto struct {
 	Verboso     bool
 	LimiteEtapa time.Duration
 	pular       atomic.Bool
+	pulou       atomic.Bool
 
 	SysMainDesativado bool
 	JogoFechado       bool
@@ -29,10 +30,19 @@ func (c *Contexto) PedirParaPular() {
 
 func (c *Contexto) ComecaEtapa() {
 	c.pular.Store(false)
+	c.pulou.Store(false)
 }
 
 func (c *Contexto) DevePular() bool {
-	return c.pular.Load()
+	if c.pular.Load() {
+		c.pulou.Store(true)
+		return true
+	}
+	return false
+}
+
+func (c *Contexto) Pulou() bool {
+	return c.pulou.Load()
 }
 
 func (c *Contexto) RegistraExecucao(caminho string, quando time.Time, fonte string) {

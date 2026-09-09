@@ -84,7 +84,11 @@ func relancarElevado() error {
 	if err != nil {
 		return err
 	}
-	args := strings.Join(os.Args[1:], " ")
+	var partes []string
+	for _, a := range os.Args[1:] {
+		partes = append(partes, syscall.EscapeArg(a))
+	}
+	args := strings.Join(partes, " ")
 	verbo, _ := syscall.UTF16PtrFromString("runas")
 	arquivo, _ := syscall.UTF16PtrFromString(exe)
 	argumentos, _ := syscall.UTF16PtrFromString(args)
@@ -778,6 +782,10 @@ func varrerMemoriaExecutavelContando(pid uint32, limiteBytes int64, fn func(Regi
 }
 
 func executarStream(limite time.Duration, fn func(io.Reader) error, nome string, args ...string) error {
+	return executarStreamCancelavel(limite, nil, fn, nome, args...)
+}
+
+func executarStreamCancelavel(limite time.Duration, cancelar func() bool, fn func(io.Reader) error, nome string, args ...string) error {
 	cmd := exec.Command(nome, args...)
 	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
 	saida, err := cmd.StdoutPipe()
@@ -789,11 +797,27 @@ func executarStream(limite time.Duration, fn func(io.Reader) error, nome string,
 	}
 	pronto := make(chan error, 1)
 	go func() { pronto <- fn(saida) }()
+	var prazo <-chan time.Time
+	if limite > 0 {
+		prazo = time.After(limite)
+	}
+	pulso := time.NewTicker(500 * time.Millisecond)
+	defer pulso.Stop()
 	var erroLeitura error
-	select {
-	case erroLeitura = <-pronto:
-	case <-time.After(limite):
-		erroLeitura = nil
+	esperando := true
+	for esperando {
+		select {
+		case erroLeitura = <-pronto:
+			esperando = false
+		case <-prazo:
+			erroLeitura = errTempoEsgotado
+			esperando = false
+		case <-pulso.C:
+			if cancelar != nil && cancelar() {
+				erroLeitura = errCancelado
+				esperando = false
+			}
+		}
 	}
 	if cmd.Process != nil {
 		cmd.Process.Kill()

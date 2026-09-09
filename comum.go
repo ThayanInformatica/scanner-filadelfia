@@ -1,7 +1,9 @@
 package main
 
 import (
+	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -369,6 +371,26 @@ func driverDeAnticheatConhecido(nome string) bool {
 	}
 	return false
 }
+
+var caminhoDoProprioExe = func() string {
+	exe, err := os.Executable()
+	if err != nil {
+		return ""
+	}
+	return strings.ToLower(exe)
+}()
+
+func ehOProprioScanner(caminho string, pid int) bool {
+	if pid != 0 && pid == os.Getpid() {
+		return true
+	}
+	return caminho != "" && strings.EqualFold(caminho, caminhoDoProprioExe)
+}
+
+var (
+	errTempoEsgotado = errors.New("o tempo limite acabou antes da leitura terminar")
+	errCancelado     = errors.New("leitura interrompida a pedido")
+)
 
 func estourouOTempo(inicio time.Time, limite time.Duration) bool {
 	return limite > 0 && time.Since(inicio) > limite

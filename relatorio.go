@@ -89,6 +89,7 @@ type Evento struct {
 	Etapa      int      `json:"etapa,omitempty"`
 	Total      int      `json:"total,omitempty"`
 	Caminhos   []string `json:"caminhos,omitempty"`
+	Seq        int      `json:"seq,omitempty"`
 }
 
 const (
@@ -295,7 +296,7 @@ func (r *Relatorio) Salvar(dir string) (string, string, error) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return "", "", err
 	}
-	base := fmt.Sprintf("scanner-%s-%s", sanitizaNome(r.Maquina), r.GeradoEm.Format("20060102-1504"))
+	base := fmt.Sprintf("scanner-%s-%s", sanitizaNome(r.Maquina), r.GeradoEm.Format("20060102-150405"))
 	caminhoTxt := filepath.Join(dir, base+".txt")
 	caminhoJSON := filepath.Join(dir, base+".json")
 

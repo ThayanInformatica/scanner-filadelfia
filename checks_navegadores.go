@@ -362,6 +362,10 @@ func checarNavegadores(c *Contexto) {
 	encontrou := false
 	for _, p := range c.Perfis {
 		for _, fonte := range fontesDeHistorico(p.Pasta) {
+			if c.DevePular() {
+				r.Linha("Historico dos navegadores interrompido a pedido")
+				return
+			}
 			encontrou = true
 			var registros []registroNavegacao
 			var err error

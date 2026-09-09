@@ -3,7 +3,6 @@
 package main
 
 import (
-	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -162,6 +161,10 @@ func checarPacotes(c *Contexto) {
 
 	achouAlgo := false
 	for i, caminho := range candidatos {
+		if c.DevePular() {
+			r.Linha("Parei no pacote %d de %d a pedido", i+1, len(candidatos))
+			break
+		}
 		r.Progresso("Abrindo pacote %d de %d: %s", i+1, len(candidatos), nomeBase(caminho))
 		pacote := abrirPacote(caminho)
 		sinais := avaliarPacote(pacote, c.A)
@@ -172,8 +175,7 @@ func checarPacotes(c *Contexto) {
 			r.Add(s.Severidade, s.Titulo, s.Detalhe)
 		}
 	}
-	if !achouAlgo {
+	if !achouAlgo && !c.Pulou() {
 		r.Ok("Nenhum programa, dll ou script escondido dentro dos pacotes conferidos")
 	}
-	_ = fmt.Sprint
 }

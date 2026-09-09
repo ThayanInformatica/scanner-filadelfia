@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-const versao = "2.9.1"
+const versao = "2.9.2"
 
 func main() {
 	exe, _ := os.Executable()
@@ -131,6 +131,7 @@ func rodarConsole(a *Assinaturas, resumoAssinaturas, saida string, rapido, verbo
 	fmt.Println(r.pinta(corCinza, resumoAssinaturas))
 
 	c := &Contexto{R: r, A: a, Rapido: rapido, Verboso: verboso, LimiteEtapa: limite}
+	preencherPerfis(c)
 	etapas := etapasDoSistema()
 	for i, etapa := range etapas {
 		r.Etapas(etapa.Nome, i+1, len(etapas))

@@ -40,7 +40,21 @@ func pararSessaoScanner() {
 	executar("logman", "stop", nomeSessaoScanner, "-ets")
 }
 
-func capturarETW(duracao time.Duration, aoVivo func(string)) ([]EventoETW, error) {
+func comandosDeCaptura(etl string) [][]string {
+	base := []string{"create", "trace", nomeSessaoScanner, "-ets",
+		"-p", "Microsoft-Windows-Kernel-Process", "0x50", "win:Informational",
+		"-p", "Microsoft-Windows-DNS-Client", "0xffffffffffffffff", "win:Informational",
+		"-o", etl}
+	comBuffer := append(append([]string{}, base...), "-nb", "16", "64", "-bs", "64", "-max", "64", "-f", "bincirc")
+	simples := append([]string{}, base...)
+	porGUID := []string{"create", "trace", nomeSessaoScanner, "-ets",
+		"-p", "{22FB2CD6-0E7B-422B-A0C7-2FAD1FD0E716}", "0x50", "win:Informational",
+		"-p", "{1C95126E-7EEA-49A9-A3FE-A378B03DDB4D}", "0xffffffffffffffff", "win:Informational",
+		"-o", etl}
+	return [][]string{comBuffer, simples, porGUID}
+}
+
+func capturarETW(duracao time.Duration, aoVivo func(string), cancelar func() bool) ([]EventoETW, error) {
 	pasta, err := os.MkdirTemp("", "scanner-etw-")
 	if err != nil {
 		return nil, err
@@ -50,18 +64,28 @@ func capturarETW(duracao time.Duration, aoVivo func(string)) ([]EventoETW, error
 	xmlSaida := filepath.Join(pasta, "captura.xml")
 
 	pararSessaoScanner()
-	args := []string{"create", "trace", nomeSessaoScanner, "-ets",
-		"-p", "Microsoft-Windows-Kernel-Process", "0x50", "win:Informational",
-		"-p", "Microsoft-Windows-DNS-Client", "0xffffffffffffffff", "win:Informational",
-		"-o", etl, "-nb", "16", "64", "-bs", "64", "-mode", "Circular", "-max", "64"}
-	if saida, err := executar("logman", args...); err != nil {
-		return nil, fmt.Errorf("iniciar sessao ETW: %v %s", err, resume(saida, 200))
+	var ultimoErro error
+	iniciou := false
+	for i, args := range comandosDeCaptura(etl) {
+		saida, err := executar("logman", args...)
+		if err == nil {
+			iniciou = true
+			break
+		}
+		ultimoErro = fmt.Errorf("tentativa %d: %v %s", i+1, err, resume(paraUTF8(saida), 160))
+		pararSessaoScanner()
+	}
+	if !iniciou {
+		return nil, fmt.Errorf("iniciar sessao ETW falhou nas 3 formas conhecidas. Ultima: %v", ultimoErro)
 	}
 	defer pararSessaoScanner()
 
 	fim := time.Now().Add(duracao)
 	marcadores := 0
 	for time.Now().Before(fim) {
+		if cancelar != nil && cancelar() {
+			return nil, errCancelado
+		}
 		restante := time.Until(fim).Round(time.Second)
 		if aoVivo != nil {
 			aoVivo(fmt.Sprintf("Gravando eventos do kernel (ImageLoad, ProcessStart, DNS). Faltam %s", restante))
@@ -183,7 +207,11 @@ func checarETW(c *Contexto) {
 	duracao := 20 * time.Second
 	inicio := time.Now()
 	r.Progresso("Iniciando captura ao vivo do kernel por %s", duracao)
-	eventos, err := capturarETW(duracao, func(msg string) { r.Progresso("%s", msg) })
+	eventos, err := capturarETW(duracao, func(msg string) { r.Progresso("%s", msg) }, c.DevePular)
+	if err == errCancelado {
+		r.Linha("Captura ao vivo do kernel interrompida a pedido")
+		return
+	}
 	if err != nil {
 		r.Erro("captura ETW ao vivo: %v", err)
 		r.Add(Info, "Captura ao vivo do kernel nao pode ser feita neste PC", fmt.Sprintf("%v\nO logman e o tracerpt do Windows nao entregaram a captura. Na maioria das vezes e limitacao da ferramenta, nao indicio. As demais checagens de ETW (sessoes e Code Integrity) rodaram normalmente", err))

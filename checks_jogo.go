@@ -43,7 +43,8 @@ func coletarArquivosDoJogo(raiz string, limite int) []ArquivoDoJogo {
 	return lista
 }
 
-func preencherAssinaturas(arquivos []ArquivoDoJogo, r *Relatorio, rotulo string) []ArquivoDoJogo {
+func preencherAssinaturas(c *Contexto, arquivos []ArquivoDoJogo, rotulo string) []ArquivoDoJogo {
+	r := c.R
 	var caminhos []string
 	for _, a := range arquivos {
 		caminhos = append(caminhos, a.Caminho)
@@ -51,6 +52,9 @@ func preencherAssinaturas(arquivos []ArquivoDoJogo, r *Relatorio, rotulo string)
 	const lote = 60
 	mapa := map[string][2]string{}
 	for i := 0; i < len(caminhos); i += lote {
+		if c.DevePular() {
+			break
+		}
 		fim := i + lote
 		if fim > len(caminhos) {
 			fim = len(caminhos)
@@ -179,7 +183,7 @@ func checarJogo(c *Contexto) {
 				r.Add(s.Severidade, s.Titulo, s.Detalhe)
 			}
 			inicio := time.Now()
-			arquivos := preencherAssinaturas(coletarArquivosDoJogo(app, 4000), r, "arquivos do FiveM")
+			arquivos := preencherAssinaturas(c, coletarArquivosDoJogo(app, 4000), "arquivos do FiveM")
 			r.Linha("%d arquivos do FiveM conferidos em %s", len(arquivos), time.Since(inicio).Round(time.Second))
 			sinais := avaliarIntegridadeDoJogo(app, arquivos, c.A)
 			for _, s := range sinais {
@@ -202,7 +206,7 @@ func checarJogo(c *Contexto) {
 	for _, pasta := range pastas {
 		r.Linha("GTA V em %s", pasta)
 		inicio := time.Now()
-		arquivos := preencherAssinaturas(coletarArquivosDoJogo(pasta, 4000), r, "arquivos do GTA V")
+		arquivos := preencherAssinaturas(c, coletarArquivosDoJogo(pasta, 4000), "arquivos do GTA V")
 		r.Linha("%d arquivos do GTA V conferidos em %s", len(arquivos), time.Since(inicio).Round(time.Second))
 		sinais := avaliarPastaDoGTA(pasta, arquivos, c.A)
 		for _, s := range sinais {

@@ -128,6 +128,9 @@ func checarRelatoriosDeErro(c *Contexto) {
 	var recentes []string
 	for _, pasta := range pastas {
 		filepath.WalkDir(pasta, func(caminho string, d fs.DirEntry, err error) error {
+			if c.DevePular() {
+				return filepath.SkipAll
+			}
 			if err != nil || d.IsDir() {
 				return nil
 			}
@@ -196,6 +199,9 @@ func checarAtalhosEJumpLists(c *Contexto) {
 		}
 		for _, pasta := range pastas {
 			filepath.WalkDir(pasta, func(caminho string, d fs.DirEntry, err error) error {
+				if c.DevePular() {
+					return filepath.SkipAll
+				}
 				if err != nil || d.IsDir() {
 					return nil
 				}

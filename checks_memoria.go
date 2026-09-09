@@ -31,6 +31,9 @@ func checarMemoriaDoJogo(c *Contexto) {
 
 	buscador := NovoBuscador(c.A.TermosParaConteudo())
 	for _, p := range alvos {
+		if c.DevePular() {
+			break
+		}
 		r.Progresso("Lendo a memoria de %s (PID %d) atras de codigo injetado", p.Nome, p.PID)
 		var achados []AchadoDeMemoria
 		regioes := 0

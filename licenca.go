@@ -42,7 +42,7 @@ func (a *Autorizacao) Configurada() bool {
 
 func (a *Autorizacao) Liberado() bool {
 	if !a.Configurada() {
-		return true
+		return false
 	}
 	a.mu.Lock()
 	defer a.mu.Unlock()

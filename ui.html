@@ -451,7 +451,7 @@
   const criar = (tag, cls, txt) => { const e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; };
   const nomesModo = { completo: "Checagem real", suspeito: "Demonstracao: cheat + rastros apagados", limpo: "Demonstracao: PC limpo", ativo: "Demonstracao: cheat ativo agora", rastros: "Demonstracao: so rastros apagados", fechou: "Demonstracao: fechou o cheat antes da telagem" };
 
-  const estado = { achados: [], sistema: [], linhas: [], etapas: [], processos: [], modulos: [], filtro: null, filtroCat: "", busca: "", buscaProc: "", filtroProc: "", rodando: false, fim: null, expandido: false, replay: false, demo: false, inicioEtapa: 0, ultimoSinal: 0, cont: { CRITICO: 0, ALERTA: 0, INFO: 0 } };
+  const estado = { achados: [], sistema: [], linhas: [], etapas: [], processos: [], modulos: [], filtro: null, filtroCat: "", busca: "", buscaProc: "", filtroProc: "", rodando: false, fim: null, expandido: false, replay: false, demo: false, inicioEtapa: 0, ultimoSinal: 0, ultimoSeq: 0, cont: { CRITICO: 0, ALERTA: 0, INFO: 0 } };
 
   function toast(msg) {
     const t = $("#toast");
@@ -561,6 +561,10 @@
   }
 
   function aplicaEvento(ev) {
+    if (ev.seq) {
+      if (ev.seq <= estado.ultimoSeq) return;
+      estado.ultimoSeq = ev.seq;
+    }
     switch (ev.tipo) {
       case "inicio":
         estado.achados = []; estado.sistema = []; estado.linhas = []; estado.etapas = []; estado.processos = []; estado.modulos = []; estado.fim = null;
@@ -966,20 +970,29 @@
     fetch(api("/api/sair")).then(() => { document.body.innerHTML = '<div class="wrap"><div class="painel"><h2>Encerrado</h2><p>O scanner foi fechado. Pode fechar esta aba.</p></div></div>'; });
   });
 
-  fetch(api("/api/estado")).then((r) => r.json()).then((e) => {
-    montaCabecalho(e);
-    estado.replay = true;
-    (e.historico || []).forEach(aplicaEvento);
-    estado.replay = false;
-    if (e.rodando) {
-      estado.rodando = true;
-      document.querySelectorAll(".acao").forEach((b) => { b.disabled = true; });
-      $("#painel-progresso").classList.remove("oculto");
-    }
-  });
+  function sincroniza(primeiraVez) {
+    return fetch(api("/api/estado")).then((r) => r.json()).then((e) => {
+      if (primeiraVez) montaCabecalho(e);
+      estado.replay = true;
+      (e.historico || []).forEach(aplicaEvento);
+      estado.replay = false;
+      if (e.rodando) {
+        estado.rodando = true;
+        document.querySelectorAll(".acao").forEach((b) => { b.disabled = true; });
+        $("#painel-progresso").classList.remove("oculto");
+      }
+    });
+  }
 
-  const fonte = new EventSource(api("/api/eventos"));
-  fonte.onmessage = (m) => { aplicaEvento(JSON.parse(m.data)); };
+  sincroniza(true).then(() => {
+    const fonte = new EventSource(api("/api/eventos"));
+    let jaConectou = false;
+    fonte.onopen = () => {
+      if (jaConectou) sincroniza(false).then(() => toast("Conexao com o scanner recuperada"));
+      jaConectou = true;
+    };
+    fonte.onmessage = (m) => { aplicaEvento(JSON.parse(m.data)); };
+  });
 })();
 </script>
 </body>

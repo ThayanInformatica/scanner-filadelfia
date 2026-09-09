@@ -241,7 +241,7 @@ func checarArquivos(c *Contexto) {
 				}
 				return nil
 			}
-			if vistos[lower] || c.A.Ignorar(lower) || strings.HasPrefix(strings.ToLower(d.Name()), "scanner") {
+			if vistos[lower] || c.A.Ignorar(lower) || ehOProprioScanner(caminho, 0) {
 				return nil
 			}
 			vistos[lower] = true

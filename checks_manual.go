@@ -35,14 +35,22 @@ func checarJournalDoDisco(c *Contexto) {
 		if inicioUSN := usnRecente(letra); inicioUSN > 0 {
 			args = []string{"usn", "readjournal", letra, fmt.Sprintf("startusn=%d", inicioUSN), "csv"}
 		}
-		err := executarStream(limiteOuPadrao(c.LimiteEtapa, 20*time.Minute), func(saida io.Reader) error {
+		const tetoDeRegistros = 40000000
+		err := executarStreamCancelavel(c.LimiteEtapa, c.DevePular, func(saida io.Reader) error {
 			var err error
-			eventos, total, err = lerUSNCsv(saida, 8000000, interessa)
+			eventos, total, err = lerUSNCsv(saida, tetoDeRegistros, interessa)
 			return err
 		}, "fsutil", args...)
-		if err != nil {
+		switch {
+		case err == errCancelado:
+			r.Linha("Journal de %s: leitura interrompida a pedido com %d registros lidos", letra, total)
+		case err == errTempoEsgotado:
+			r.Add(Alerta, "LEITURA DO JOURNAL DE "+letra+" INCOMPLETA: parou por tempo", fmt.Sprintf("%d registros lidos em %s antes do limite. Rode sem limite para ler tudo", total, time.Since(inicio).Round(time.Second)))
+		case err != nil:
 			r.Erro("journal de %s: %v", letra, err)
 			continue
+		case total >= tetoDeRegistros:
+			r.Add(Alerta, "LEITURA DO JOURNAL DE "+letra+" INCOMPLETA: journal maior que o teto", fmt.Sprintf("Parei em %d registros. O journal e maior que isso e a parte mais antiga ficou de fora", total))
 		}
 		r.Linha("Journal de %s: %d registros lidos em %s", letra, total, time.Since(inicio).Round(time.Second))
 		sinais := avaliarUSN(letra, eventos, total, c.A)
@@ -209,7 +217,7 @@ func checarStreamsOcultos(c *Contexto) {
 		})
 	}
 	r.Linha("Fluxos alternativos: %d arquivos conferidos em %s", arquivos, time.Since(inicio).Round(time.Second))
-	if interrompido {
+	if interrompido && !c.Pulou() {
 		r.Add(Alerta, "LEITURA DE FLUXOS ALTERNATIVOS INCOMPLETA: parou por tempo", "Parte dos arquivos nao foi conferida. Rode de novo sem limite")
 	}
 	sinais := avaliarStreamsOcultos(streams, c.A)

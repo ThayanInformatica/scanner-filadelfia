@@ -51,7 +51,7 @@ func checarProcessos(c *Contexto) {
 			if info.ExisteNoDisco {
 				info.OriginalFilename, info.ProductName, info.CompanyName, info.FileDescription = infoDeVersao(p.Caminho)
 				lower := strings.ToLower(p.Caminho)
-				if !caminhoDoSistema(p.Caminho) && !vistoCaminho[lower] && len(candidatosAssinatura) < 120 {
+				if !caminhoDoSistema(p.Caminho) && !vistoCaminho[lower] && len(candidatosAssinatura) < 400 {
 					vistoCaminho[lower] = true
 					candidatosAssinatura = append(candidatosAssinatura, p.Caminho)
 				}
@@ -78,7 +78,7 @@ func checarProcessos(c *Contexto) {
 	totalSinais := 0
 	for _, info := range infos {
 		nome := strings.ToLower(info.Nome)
-		if strings.HasPrefix(nome, "scanner") {
+		if ehOProprioScanner(info.Caminho, info.PID) {
 			continue
 		}
 		sinais := avaliarProcesso(info, c.A, agora)

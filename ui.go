@@ -36,6 +36,9 @@ type Servidor struct {
 	contexto  *Contexto
 	ouvintes  map[chan Evento]bool
 	encerrar  chan struct{}
+	sequencia int
+
+	fecharUmaVez sync.Once
 }
 
 func NovoServidor(a *Assinaturas, origem, pastaSaida string) *Servidor {
@@ -54,6 +57,8 @@ func NovoServidor(a *Assinaturas, origem, pastaSaida string) *Servidor {
 
 func (s *Servidor) publica(e Evento) {
 	s.mu.Lock()
+	s.sequencia++
+	e.Seq = s.sequencia
 	s.historico = append(s.historico, e)
 	ouvintes := make([]chan Evento, 0, len(s.ouvintes))
 	for c := range s.ouvintes {
@@ -152,6 +157,9 @@ func (s *Servidor) executar(modo string, rapido bool) {
 	if rapido {
 		c.LimiteEtapa = 2 * time.Minute
 	}
+	if !simulacao {
+		preencherPerfis(c)
+	}
 	s.mu.Lock()
 	s.contexto = c
 	s.mu.Unlock()
@@ -161,7 +169,7 @@ func (s *Servidor) executar(modo string, rapido bool) {
 		r.Etapas(etapa.Nome, i+1, len(etapas))
 		c.ComecaEtapa()
 		executaProtegido(r, etapa.Nome, etapa.Fn, c)
-		if c.DevePular() {
+		if c.Pulou() {
 			r.Add(Alerta, "ETAPA PULADA A PEDIDO: "+etapa.Nome, "Alguem clicou em pular durante esta etapa, entao ela nao terminou. O que ela mediria ficou de fora deste relatorio")
 			r.MarcaIncompleta(etapa.Nome)
 		}
@@ -459,10 +467,12 @@ func (s *Servidor) rotas() *http.ServeMux {
 			return
 		}
 		escreveJSON(w, map[string]any{"ok": true})
-		go func() {
-			time.Sleep(400 * time.Millisecond)
-			close(s.encerrar)
-		}()
+		s.fecharUmaVez.Do(func() {
+			go func() {
+				time.Sleep(400 * time.Millisecond)
+				close(s.encerrar)
+			}()
+		})
 	})
 
 	return mux
