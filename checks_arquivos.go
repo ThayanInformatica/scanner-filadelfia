@@ -8,8 +8,10 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 )
@@ -184,6 +186,22 @@ func lerMetadadoLixeira(caminho string) (string, time.Time) {
 	return utf16DeBytes(b[24:]), deletado
 }
 
+type tarefaDeArquivo struct {
+	caminho          string
+	nome             string
+	conferirHash     bool
+	conferirDisfarce bool
+	driver           bool
+}
+
+type achadoDeHash struct {
+	caminho string
+	nome    string
+	hash    string
+	rotulo  string
+	driver  bool
+}
+
 type arquivoAchado struct {
 	Caminho string
 	Hora    time.Time
@@ -216,6 +234,49 @@ func checarArquivos(c *Contexto) {
 	var recentes []arquivoAchado
 	var disfarcados []string
 	vistos := map[string]bool{}
+
+	fila := make(chan tarefaDeArquivo, 4096)
+	var mu sync.Mutex
+	var porHash []achadoDeHash
+	var wg sync.WaitGroup
+	trabalhadores := runtime.NumCPU()
+	if trabalhadores > 8 {
+		trabalhadores = 8
+	}
+	if trabalhadores < 2 {
+		trabalhadores = 2
+	}
+	for i := 0; i < trabalhadores; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for t := range fila {
+				if estourouOTempo(inicio, limiteTempo) || c.DevePular() {
+					continue
+				}
+				if t.conferirHash {
+					h := sha256DoArquivo(t.caminho, 32*1024*1024)
+					if h == "" {
+						continue
+					}
+					rotulo := c.A.HashConhecido(h)
+					if rotulo == "" {
+						continue
+					}
+					mu.Lock()
+					porHash = append(porHash, achadoDeHash{caminho: t.caminho, nome: t.nome, hash: h, rotulo: rotulo, driver: t.driver})
+					mu.Unlock()
+					continue
+				}
+				if t.conferirDisfarce && comecaComCabecalhoDePrograma(t.caminho) {
+					mu.Lock()
+					disfarcados = append(disfarcados, t.caminho)
+					mu.Unlock()
+				}
+			}
+		}()
+	}
+	enfileira := func(t tarefaDeArquivo) { fila <- t }
 
 	visita := func(raiz string, profundidadeMax int, quente bool) {
 		raiz = filepath.Clean(raiz)
@@ -270,15 +331,8 @@ func checarArquivos(c *Contexto) {
 				return nil
 			}
 			if ext == ".sys" {
-				h := ""
 				if c.A.TemHashes() {
-					h = sha256DoArquivo(caminho, 32*1024*1024)
-				}
-				if h != "" {
-					if rotulo := c.A.HashConhecido(h); rotulo != "" {
-						r.Add(Critico, "Driver com HASH conhecido no disco: "+d.Name(), caminho+"\nSHA256: "+h+"\nBate com: "+rotulo+"\nO hash nao muda quando o arquivo e renomeado")
-						return nil
-					}
+					enfileira(tarefaDeArquivo{caminho: caminho, nome: d.Name(), conferirHash: true, driver: true})
 				}
 				if c.A.SysConhecidoDoSistema(d.Name()) || strings.Count(caminho, string(os.PathSeparator)) <= 1 {
 					return nil
@@ -303,12 +357,7 @@ func checarArquivos(c *Contexto) {
 			if quente {
 				if ext == ".exe" || ext == ".dll" {
 					if c.A.TemHashes() {
-						if h := sha256DoArquivo(caminho, 32*1024*1024); h != "" {
-							if rotulo := c.A.HashConhecido(h); rotulo != "" {
-								r.Add(Critico, "Arquivo com HASH de cheat conhecido: "+d.Name(), caminho+"\nSHA256: "+h+"\nBate com: "+rotulo+"\nO hash nao muda quando o arquivo e renomeado")
-								return nil
-							}
-						}
+						enfileira(tarefaDeArquivo{caminho: caminho, nome: d.Name(), conferirHash: true})
 					}
 					if pareceNomeAleatorio(d.Name()) {
 						r.Add(Alerta, "Executavel com nome aleatorio: "+d.Name(), caminho)
@@ -317,8 +366,11 @@ func checarArquivos(c *Contexto) {
 					if info, err := d.Info(); err == nil && time.Since(info.ModTime()) < 7*24*time.Hour {
 						recentes = append(recentes, arquivoAchado{Caminho: caminho, Hora: info.ModTime(), Tamanho: info.Size()})
 					}
-				} else if extensoesInocentes[ext] && !extensoesPE[ext] && !nomeDeBackupOuTemporario(d.Name(), caminho) && !arquivoDoProprioJogo(caminho) && !pacoteDeDriverOuInstalador(caminho) && ehExecutavelDisfarcado(caminho, d) {
-					disfarcados = append(disfarcados, caminho)
+				} else if extensoesInocentes[ext] && !extensoesPE[ext] && !nomeDeBackupOuTemporario(d.Name(), caminho) && !arquivoDoProprioJogo(caminho) && !pacoteDeDriverOuInstalador(caminho) {
+					info, err := d.Info()
+					if err == nil && info.Size() >= 1024 && info.Size() <= 200*1024*1024 {
+						enfileira(tarefaDeArquivo{caminho: caminho, nome: d.Name(), conferirDisfarce: true})
+					}
 				}
 			}
 			return nil
@@ -335,6 +387,18 @@ func checarArquivos(c *Contexto) {
 		visita(u, 3, true)
 		visita(u, 40, false)
 	}
+	close(fila)
+	wg.Wait()
+
+	sort.Slice(porHash, func(i, j int) bool { return porHash[i].caminho < porHash[j].caminho })
+	for _, a := range porHash {
+		titulo := "Arquivo com HASH de cheat conhecido: " + a.nome
+		if a.driver {
+			titulo = "Driver com HASH conhecido no disco: " + a.nome
+		}
+		r.Add(Critico, titulo, a.caminho+"\nSHA256: "+a.hash+"\nBate com: "+a.rotulo+"\nO hash nao muda quando o arquivo e renomeado")
+	}
+
 	r.Linha("%d arquivos analisados em %s", total, time.Since(inicio).Round(time.Second))
 	if estourouOTempo(inicio, limiteTempo) {
 		r.Add(Alerta, "VARREDURA INCOMPLETA: parou por tempo", fmt.Sprintf("O limite de %s foi atingido e parte do disco NAO foi analisada. Rode de novo sem limite (a checagem completa nao tem limite por padrao) antes de concluir qualquer coisa sobre este PC", limiteTempo.Round(time.Second)))
@@ -373,11 +437,7 @@ var extensoesPE = map[string]bool{
 	".msi": true, ".msp": true, ".cab": true, ".xex": true, ".nlp": true, ".bpl": true, ".dpl": true, ".vxd": true,
 }
 
-func ehExecutavelDisfarcado(caminho string, d fs.DirEntry) bool {
-	info, err := d.Info()
-	if err != nil || info.Size() < 1024 || info.Size() > 200*1024*1024 {
-		return false
-	}
+func comecaComCabecalhoDePrograma(caminho string) bool {
 	f, err := os.Open(caminho)
 	if err != nil {
 		return false

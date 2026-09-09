@@ -38,8 +38,8 @@ func etapasDoSistema() []Etapa {
 		{"Rastros de execucao (PC stopado?)", checarRastrosDeExecucao, false},
 		{"Historico dos navegadores", checarNavegadores, false},
 		{"Discord", checarDiscord, false},
-		{"Varredura de arquivos", checarArquivos, true},
 		{"Strings de cheat no conteudo dos arquivos", checarConteudo, true},
+		{"Varredura de arquivos", checarArquivos, true},
 	}
 }
 
