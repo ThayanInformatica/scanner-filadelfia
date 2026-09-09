@@ -1,0 +1,171 @@
+{
+  "cheats": [
+    "exemplo cheat menu",
+    "exemplo loader",
+    "exemplo injector"
+  ],
+  "marcas": [
+    "exemplocheat"
+  ],
+  "dominios": [
+    "exemplo-cheat.test"
+  ],
+  "strings_conteudo": [
+    "exemplo cheat menu"
+  ],
+  "ferramentas": [
+    "cheat engine",
+    "process hacker",
+    "extreme injector"
+  ],
+  "limpeza": [
+    "ccleaner",
+    "bleachbit",
+    "privazer"
+  ],
+  "drivers_vulneraveis": [
+    "iqvw64e.sys",
+    "rtcore64.sys",
+    "gdrv.sys"
+  ],
+  "palavras_web": [],
+  "ignorar_web": [],
+  "ignorar_caminhos": [],
+  "pastas_extra": [],
+  "hardware_dma": [],
+  "hardware_entrada": [],
+  "controle_remoto": [],
+  "servicos_esperados": [
+    {
+      "nome": "EventLog",
+      "descricao": "Log de eventos do Windows. Parado ou desativado = esconde rastros de tudo",
+      "nivel": "critico"
+    },
+    {
+      "nome": "SysMain",
+      "descricao": "Superfetch/Prefetch. Desligar apaga o registro de programas executados",
+      "nivel": "alerta"
+    },
+    {
+      "nome": "PcaSvc",
+      "descricao": "Assistente de compatibilidade. Grava caminho de cada exe executado",
+      "nivel": "critico"
+    },
+    {
+      "nome": "DPS",
+      "descricao": "Diagnostic Policy Service. Base do SRUM/PcaSvc, cheaters desligam para nao registrar exe",
+      "nivel": "critico"
+    },
+    {
+      "nome": "Dnscache",
+      "descricao": "Cache de DNS. Desligar limpa o historico de sites do loader do cheat",
+      "nivel": "alerta"
+    },
+    {
+      "nome": "WinDefend",
+      "descricao": "Windows Defender",
+      "nivel": "critico"
+    },
+    {
+      "nome": "wscsvc",
+      "descricao": "Central de Seguranca do Windows",
+      "nivel": "alerta"
+    },
+    {
+      "nome": "SecurityHealthService",
+      "descricao": "Windows Security Health",
+      "nivel": "alerta"
+    },
+    {
+      "nome": "DiagTrack",
+      "descricao": "Telemetria. Registra execucao de apps (comum desligar por privacidade)",
+      "nivel": "info"
+    },
+    {
+      "nome": "WSearch",
+      "descricao": "Windows Search. Indice de arquivos recentes",
+      "nivel": "info"
+    },
+    {
+      "nome": "Schedule",
+      "descricao": "Agendador de tarefas",
+      "nivel": "alerta"
+    },
+    {
+      "nome": "BAM",
+      "descricao": "Background Activity Moderator. Grava ultima execucao de cada exe por usuario",
+      "nivel": "critico"
+    },
+    {
+      "nome": "CDPSvc",
+      "descricao": "Connected Devices Platform. Alimenta a linha do tempo/atividades",
+      "nivel": "info"
+    },
+    {
+      "nome": "SgrmBroker",
+      "descricao": "System Guard Runtime Monitor",
+      "nivel": "info"
+    }
+  ],
+  "processos_sistema": {
+    "svchost.exe": "windows\\system32",
+    "csrss.exe": "windows\\system32",
+    "lsass.exe": "windows\\system32",
+    "winlogon.exe": "windows\\system32",
+    "services.exe": "windows\\system32",
+    "smss.exe": "windows\\system32",
+    "wininit.exe": "windows\\system32",
+    "dwm.exe": "windows\\system32",
+    "explorer.exe": "windows",
+    "runtimebroker.exe": "windows\\system32",
+    "conhost.exe": "windows\\system32",
+    "taskhostw.exe": "windows\\system32",
+    "dllhost.exe": "windows\\system32",
+    "spoolsv.exe": "windows\\system32",
+    "searchindexer.exe": "windows\\system32",
+    "ctfmon.exe": "windows\\system32",
+    "sihost.exe": "windows\\system32",
+    "fontdrvhost.exe": "windows\\system32",
+    "audiodg.exe": "windows\\system32",
+    "wmiprvse.exe": "windows\\system32\\wbem",
+    "werfault.exe": "windows\\system32",
+    "rundll32.exe": "windows",
+    "regsvr32.exe": "windows",
+    "msiexec.exe": "windows\\system32",
+    "lsm.exe": "windows\\system32",
+    "taskmgr.exe": "windows\\system32",
+    "cmd.exe": "windows\\system32",
+    "powershell.exe": "windows\\system32\\windowspowershell",
+    "wscript.exe": "windows\\system32",
+    "cscript.exe": "windows\\system32",
+    "mmc.exe": "windows\\system32",
+    "svchost64.exe": "",
+    "csrs.exe": "",
+    "lsas.exe": "",
+    "svch0st.exe": "",
+    "scvhost.exe": "",
+    "svchosts.exe": "",
+    "expl0rer.exe": "",
+    "explore.exe": "",
+    "iexplorer.exe": "",
+    "winlogin.exe": "",
+    "lsasss.exe": "",
+    "dwn.exe": "",
+    "rundl132.exe": "",
+    "runtimebrocker.exe": ""
+  },
+  "sys_do_sistema": [
+    "hiberfil.sys",
+    "pagefile.sys",
+    "swapfile.sys",
+    "ntuser.sys",
+    "bootsect.sys",
+    "io.sys",
+    "msdos.sys",
+    "config.sys",
+    "install.sys",
+    "boot.sys",
+    "dumpstack.log.tmp",
+    "memory.dmp"
+  ]
+}

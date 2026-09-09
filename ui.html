@@ -1,0 +1,991 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Scanner Filadelfia</title>
+<style>
+  :root {
+    --tinta0: #08090a;
+    --tinta1: #0e1013;
+    --tinta2: #14171b;
+    --tinta3: #1b1f25;
+    --linha: #23272e;
+    --linha2: #333943;
+    --osso: #edeff2;
+    --texto: #dfe3e8;
+    --fraco: #98a0ab;
+    --mudo: #5f6773;
+    --critico: #ff4438;
+    --alerta: #ffb020;
+    --info: #5aa9ff;
+    --ok: #46d17f;
+    --display: "Bahnschrift Condensed", "Bahnschrift", "Oswald", "Arial Narrow", "Segoe UI", sans-serif;
+    --corpo: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, sans-serif;
+    --mono: "Cascadia Mono", "Consolas", ui-monospace, "SF Mono", monospace;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0; background: var(--tinta0); color: var(--texto); min-height: 100vh;
+    font: 14px/1.55 var(--corpo); -webkit-font-smoothing: antialiased;
+  }
+  body::before {
+    content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 3;
+    background: repeating-linear-gradient(0deg, rgba(255,255,255,.02) 0 1px, transparent 1px 3px);
+    mix-blend-mode: screen;
+  }
+  body::after {
+    content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 2;
+    background: radial-gradient(150% 110% at 50% 0%, transparent 60%, rgba(0,0,0,.32) 100%);
+  }
+  code, .mono { font-family: var(--mono); }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 0 26px 90px; position: relative; z-index: 1; }
+  .oculto { display: none !important; }
+  ::selection { background: var(--osso); color: var(--tinta0); }
+
+  header {
+    display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+    padding: 20px 0 18px; border-bottom: 1px solid var(--linha); margin-bottom: 4px;
+  }
+  .logo {
+    width: 36px; height: 36px; border: 1px solid var(--osso); display: grid; place-items: center; flex: none;
+    position: relative;
+  }
+  .logo::after {
+    content: ""; position: absolute; inset: -4px; border: 1px solid var(--linha2);
+  }
+  .logo svg { width: 20px; height: 20px; stroke: var(--osso); }
+  .marca h1 { margin: 0; font-family: var(--display); font-size: 22px; font-weight: 600; letter-spacing: .34em; text-transform: uppercase; line-height: 1; }
+  .marca p { margin: 5px 0 0; color: var(--mudo); font-family: var(--mono); font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; }
+  .marca p b { color: var(--fraco); font-weight: 500; }
+  .chips { display: flex; gap: 0; flex-wrap: wrap; margin-left: auto; border: 1px solid var(--linha); }
+  .chip {
+    display: inline-flex; align-items: center; gap: 7px; padding: 7px 13px; font-family: var(--mono);
+    font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--mudo);
+    border-right: 1px solid var(--linha);
+  }
+  .chip:last-child { border-right: 0; }
+  .chip b { color: var(--texto); font-weight: 600; }
+  .chip.bom b { color: var(--ok); }
+  .chip.ruim b { color: var(--alerta); }
+  .ponto { width: 5px; height: 5px; background: currentColor; }
+
+  .aviso {
+    margin-top: 18px; padding: 13px 16px; font-size: 12.5px; color: var(--alerta);
+    border: 1px solid rgba(255,176,32,.35); background: rgba(255,176,32,.05);
+    display: flex; gap: 11px; align-items: center;
+  }
+  .aviso svg { flex: none; }
+
+  .secao-titulo { display: flex; align-items: center; gap: 14px; margin: 34px 0 14px; }
+  .secao-titulo h2 {
+    margin: 0; font-family: var(--display); font-size: 15px; letter-spacing: .22em;
+    text-transform: uppercase; color: var(--osso); font-weight: 600; white-space: nowrap;
+  }
+  .secao-titulo span { font-size: 11.5px; color: var(--mudo); }
+  .secao-titulo::after { content: ""; flex: 1; height: 1px; background: var(--linha); }
+
+  .grid-acoes { display: grid; grid-template-columns: repeat(auto-fit, minmax(268px, 1fr)); gap: 1px; background: var(--linha); border: 1px solid var(--linha); }
+  .acao {
+    position: relative; text-align: left; background: var(--tinta1); border: 0; color: var(--texto);
+    padding: 20px 20px 22px; cursor: pointer; font-family: inherit; transition: background .16s, transform .16s;
+  }
+  .acao::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 2px; background: transparent; transition: background .16s; }
+  .acao:hover:not(:disabled) { background: var(--tinta2); }
+  .acao:hover:not(:disabled)::before { background: var(--osso); }
+  .acao:disabled { opacity: .34; cursor: not-allowed; }
+  .acao .icone { display: block; width: 26px; height: 26px; margin-bottom: 14px; color: var(--fraco); }
+  .acao .icone svg { width: 100%; height: 100%; }
+  .acao strong { display: block; font-family: var(--display); font-size: 19px; letter-spacing: .06em; text-transform: uppercase; font-weight: 600; margin-bottom: 7px; }
+  .acao small { color: var(--mudo); font-size: 12px; line-height: 1.5; display: block; }
+  .acao .selo {
+    position: absolute; right: 16px; top: 16px; font-family: var(--mono); font-size: 9.5px;
+    letter-spacing: .16em; color: var(--mudo); border: 1px solid var(--linha2); padding: 2px 6px;
+  }
+  .acao.destaque { background: var(--tinta2); }
+  .acao.destaque::before { background: var(--linha2); }
+  .acao.destaque:hover::before { background: var(--osso); }
+  .acao.d-critico .icone { color: var(--critico); }
+  .acao.d-alerta .icone { color: var(--alerta); }
+  .acao.d-ok .icone { color: var(--ok); }
+
+  .painel { background: var(--tinta1); border: 1px solid var(--linha); padding: 20px; margin-top: 18px; }
+
+  .trava { border-color: var(--linha2); position: relative; padding-left: 30px; }
+  .trava::before {
+    content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 10px;
+    background: repeating-linear-gradient(45deg, var(--alerta) 0 7px, var(--tinta0) 7px 14px); opacity: .8;
+  }
+  .trava-topo { display: flex; gap: 14px; align-items: flex-start; margin-bottom: 16px; }
+  .trava-topo strong { display: block; font-family: var(--display); font-size: 18px; letter-spacing: .05em; text-transform: uppercase; margin-bottom: 4px; }
+  .trava-topo small { color: var(--mudo); font-size: 12px; }
+  .cadeado { width: 30px; height: 30px; border: 1px solid var(--alerta); display: grid; place-items: center; color: var(--alerta); flex: none; }
+  .cadeado svg { width: 15px; height: 15px; }
+  #codigo-auth { text-transform: uppercase; letter-spacing: .22em; font-family: var(--mono); }
+  .erro-auth { color: var(--critico); font-family: var(--mono); font-size: 11.5px; min-height: 16px; margin: 10px 0 0; }
+
+  input, select {
+    background: var(--tinta0); border: 1px solid var(--linha); color: var(--texto);
+    padding: 11px 13px; font-size: 13.5px; font-family: inherit; border-radius: 0;
+  }
+  input:focus, select:focus { outline: none; border-color: var(--osso); }
+  input::placeholder { color: var(--mudo); }
+  .filtros { display: flex; gap: 10px; flex-wrap: wrap; }
+  .filtros input[type="search"], .filtros input:not([type]) { flex: 1; min-width: 200px; }
+  .filtros select { min-width: 180px; }
+
+  .btn {
+    background: transparent; border: 1px solid var(--linha2); color: var(--texto); padding: 11px 18px;
+    font-family: var(--display); font-size: 13.5px; letter-spacing: .12em; text-transform: uppercase;
+    font-weight: 600; cursor: pointer; transition: background .15s, color .15s, border-color .15s;
+  }
+  .btn:hover:not(:disabled) { border-color: var(--osso); background: var(--tinta3); }
+  .btn.primario { background: var(--osso); color: var(--tinta0); border-color: var(--osso); }
+  .btn.primario:hover:not(:disabled) { background: #fff; }
+  .btn.perigo { color: var(--critico); border-color: rgba(255,68,56,.4); }
+  .btn.perigo:hover { background: rgba(255,68,56,.1); border-color: var(--critico); }
+  .btn:disabled { opacity: .4; cursor: default; }
+
+  .progresso-topo { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 14px; }
+  .etapa span { display: block; font-family: var(--display); font-size: 26px; letter-spacing: .04em; text-transform: uppercase; line-height: 1.1; }
+  .etapa small { display: block; color: var(--mudo); font-family: var(--mono); font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; margin-top: 5px; }
+  #etapa-contador { font-family: var(--mono); font-size: 13px; color: var(--fraco); letter-spacing: .1em; flex: none; }
+  .barra { height: 2px; background: var(--linha); overflow: hidden; position: relative; }
+  .barra i { display: block; height: 100%; width: 0; background: var(--osso); transition: width .4s ease; }
+  .barra::after {
+    content: ""; position: absolute; top: 0; left: 0; height: 100%; width: 90px;
+    background: linear-gradient(90deg, transparent, rgba(237,239,242,.5), transparent);
+    animation: varre 2.4s linear infinite;
+  }
+  @keyframes varre { from { transform: translateX(-100px); } to { transform: translateX(1200px); } }
+
+  .stepper { list-style: none; margin: 18px 0 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 2px 20px; }
+  .stepper li { font-family: var(--mono); font-size: 11px; color: var(--mudo); padding: 3px 0 3px 20px; position: relative; letter-spacing: .02em; }
+  .stepper li::before { content: "·"; position: absolute; left: 4px; color: var(--linha2); }
+  .stepper li.feita { color: var(--fraco); }
+  .stepper li.feita::before { content: "✓"; color: var(--ok); font-size: 10px; }
+  .stepper li.atual { color: var(--osso); }
+  .stepper li.atual::before { content: "▸"; color: var(--osso); }
+
+  .atividade { display: flex; align-items: center; gap: 11px; margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--linha); font-family: var(--mono); font-size: 11.5px; color: var(--fraco); }
+  .atividade .pulso { width: 6px; height: 6px; background: var(--ok); flex: none; animation: bate 1.1s ease-in-out infinite; }
+  @keyframes bate { 0%,100% { opacity: 1; } 50% { opacity: .18; } }
+  .atividade .texto { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .atividade .tempo { color: var(--mudo); flex: none; }
+  .atividade.parado .pulso { animation: none; background: var(--mudo); }
+
+  .contagem-viva { display: flex; gap: 22px; margin-top: 14px; font-family: var(--mono); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--mudo); }
+  .contagem-viva b { font-size: 15px; margin-right: 5px; }
+  .contagem-viva .c b { color: var(--critico); }
+  .contagem-viva .a b { color: var(--alerta); }
+  .contagem-viva .i b { color: var(--info); }
+
+  .ticker { margin-top: 14px; height: 76px; overflow: hidden; font-family: var(--mono); font-size: 11px; color: var(--mudo); mask-image: linear-gradient(180deg, #000 50%, transparent); }
+  .ticker div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 1px 0; }
+  .ticker div.CRITICO { color: var(--critico); }
+  .ticker div.ALERTA { color: var(--alerta); }
+  .ticker div.ok { color: var(--ok); }
+
+  .linha-pular { display: flex; align-items: center; gap: 12px; margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--linha); }
+  button.pular { background: transparent; border: 1px solid var(--linha); color: var(--mudo); padding: 7px 14px; font-family: var(--mono); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; cursor: pointer; }
+  button.pular:hover:not(:disabled) { color: var(--alerta); border-color: var(--alerta); }
+  button.pular:disabled { opacity: .45; cursor: default; }
+  .linha-pular small { color: var(--mudo); font-size: 11px; }
+
+  .veredito { display: flex; gap: 20px; align-items: center; padding: 22px; border: 2px solid var(--linha2); margin-bottom: 20px; position: relative; }
+  .veredito .selo { width: 54px; height: 54px; display: grid; place-items: center; font-family: var(--display); font-size: 30px; font-weight: 700; border: 2px solid currentColor; flex: none; }
+  .veredito .frase { display: block; font-family: var(--display); font-size: 25px; letter-spacing: .05em; text-transform: uppercase; line-height: 1.15; }
+  .veredito small { display: block; color: var(--mudo); font-size: 12px; margin-top: 6px; }
+  .veredito.critico { border-color: var(--critico); background: rgba(255,68,56,.05); }
+  .veredito.critico .selo, .veredito.critico .frase { color: var(--critico); }
+  .veredito.alerta { border-color: var(--alerta); background: rgba(255,176,32,.05); }
+  .veredito.alerta .selo, .veredito.alerta .frase { color: var(--alerta); }
+  .veredito.ok { border-color: var(--ok); background: rgba(70,209,127,.05); }
+  .veredito.ok .selo, .veredito.ok .frase { color: var(--ok); }
+
+  .contadores { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 1px; background: var(--linha); border: 1px solid var(--linha); margin-bottom: 20px; }
+  .contador { background: var(--tinta1); border: 0; padding: 16px 18px; cursor: pointer; text-align: left; font-family: inherit; color: var(--texto); transition: background .15s; }
+  .contador:hover { background: var(--tinta2); }
+  .contador b { display: block; font-family: var(--display); font-size: 34px; font-weight: 600; line-height: 1; font-variant-numeric: tabular-nums; }
+  .contador span { display: block; font-family: var(--mono); font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: var(--mudo); margin-top: 7px; }
+  .contador.c b { color: var(--critico); }
+  .contador.a b { color: var(--alerta); }
+  .contador.i b { color: var(--info); }
+  .contador.e b { color: var(--fraco); }
+  .contador.ativo { background: var(--tinta3); box-shadow: inset 0 2px 0 var(--osso); }
+
+  .abas { display: flex; gap: 24px; border-bottom: 1px solid var(--linha); margin-bottom: 18px; flex-wrap: wrap; }
+  .aba { background: none; border: 0; border-bottom: 2px solid transparent; color: var(--mudo); padding: 11px 0; margin-bottom: -1px; font-family: var(--display); font-size: 14px; letter-spacing: .14em; text-transform: uppercase; font-weight: 600; cursor: pointer; }
+  .aba:hover { color: var(--fraco); }
+  .aba.ativa { color: var(--osso); border-bottom-color: var(--osso); }
+  .aba .num { margin-left: 7px; font-family: var(--mono); font-size: 10px; color: var(--mudo); letter-spacing: 0; }
+
+  .grupo-cat { font-family: var(--mono); font-size: 10px; letter-spacing: .18em; text-transform: uppercase; color: var(--mudo); margin: 22px 0 9px; padding-bottom: 7px; border-bottom: 1px solid var(--linha); }
+  .grupo-cat:first-child { margin-top: 4px; }
+  .achado { border-left: 3px solid var(--linha2); background: var(--tinta1); margin-bottom: 2px; }
+  .achado summary { display: flex; align-items: flex-start; gap: 12px; padding: 12px 15px; cursor: pointer; list-style: none; }
+  .achado summary::-webkit-details-marker { display: none; }
+  .achado summary:hover { background: var(--tinta2); }
+  .achado .tag { font-family: var(--mono); font-size: 9.5px; font-weight: 700; letter-spacing: .12em; padding: 3px 7px; border: 1px solid currentColor; flex: none; margin-top: 1px; }
+  .achado .titulo { flex: 1; font-size: 13.5px; font-weight: 600; }
+  .achado .titulo small { display: block; font-family: var(--mono); color: var(--mudo); font-weight: 400; font-size: 10px; letter-spacing: .1em; text-transform: uppercase; margin-top: 4px; }
+  .achado .seta { color: var(--mudo); font-size: 9px; transition: transform .16s; margin-top: 4px; }
+  .achado[open] .seta { transform: rotate(90deg); }
+  .achado.CRITICO { border-left-color: var(--critico); }
+  .achado.CRITICO .tag { color: var(--critico); }
+  .achado.ALERTA { border-left-color: var(--alerta); }
+  .achado.ALERTA .tag { color: var(--alerta); }
+  .achado.INFO { border-left-color: var(--linha2); }
+  .achado.INFO .tag { color: var(--info); }
+  .achado pre { margin: 0; padding: 2px 15px 15px 50px; white-space: pre-wrap; word-break: break-word; font-family: var(--mono); font-size: 11.5px; line-height: 1.6; color: var(--fraco); }
+  .achado .semdetalhe { padding: 2px 15px 15px 50px; color: var(--mudo); font-size: 12px; }
+  .caminhos { display: flex; flex-wrap: wrap; gap: 7px; padding: 0 15px 15px 50px; }
+  .caminho-btn { display: inline-flex; align-items: center; gap: 7px; background: var(--tinta2); border: 1px solid var(--linha2); color: var(--fraco); padding: 6px 11px; font-family: var(--mono); font-size: 10.5px; cursor: pointer; }
+  .caminho-btn:hover { color: var(--osso); border-color: var(--osso); }
+  .caminho-btn svg { width: 12px; height: 12px; }
+
+  .vazio { padding: 40px; text-align: center; color: var(--mudo); font-family: var(--mono); font-size: 12px; }
+  .semdetalhe { font-family: var(--mono); }
+  .rolagem { overflow-x: auto; border: 1px solid var(--linha); }
+  table.tabela { width: 100%; border-collapse: collapse; font-size: 12.5px; min-width: 680px; }
+  table.tabela th { text-align: left; font-family: var(--mono); font-size: 9.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--mudo); padding: 10px 12px; border-bottom: 1px solid var(--linha); font-weight: 600; background: var(--tinta2); }
+  table.tabela td { padding: 10px 12px; border-bottom: 1px solid rgba(35,39,46,.7); vertical-align: top; }
+  table.tabela tr:last-child td { border-bottom: 0; }
+  table.tabela td.mono { font-family: var(--mono); font-size: 11px; color: var(--fraco); }
+  .tag-mini { font-family: var(--mono); font-size: 9.5px; letter-spacing: .1em; text-transform: uppercase; padding: 2px 6px; border: 1px solid currentColor; }
+  .tag-mini.cheat { color: var(--critico); }
+  .tag-mini.suspeito { color: var(--alerta); }
+  .tag-mini.fivem { color: var(--info); }
+  .sub-bloco { margin-top: 24px; }
+  .sub-bloco h3 { font-family: var(--display); font-size: 14px; letter-spacing: .16em; text-transform: uppercase; color: var(--fraco); margin: 0 0 10px; font-weight: 600; }
+  pre.log { background: var(--tinta0); border: 1px solid var(--linha); padding: 16px; max-height: 560px; overflow: auto; font-family: var(--mono); font-size: 11.5px; line-height: 1.6; color: var(--fraco); white-space: pre-wrap; word-break: break-word; margin: 0; }
+
+  .rodape-acoes { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 26px; padding-top: 20px; border-top: 1px solid var(--linha); }
+  .rodape-acoes .btn svg { width: 15px; height: 15px; vertical-align: -3px; margin-right: 7px; }
+  .arquivos { margin-top: 14px; font-family: var(--mono); font-size: 10.5px; color: var(--mudo); }
+  .arquivos .mono { padding: 2px 0; word-break: break-all; }
+
+  .protocolo { border: 1px solid var(--ok); background: rgba(70,209,127,.05); padding: 18px; margin-bottom: 14px; text-align: center; }
+  .protocolo b { display: block; font-family: var(--mono); font-size: 26px; letter-spacing: .18em; color: var(--ok); margin: 8px 0; }
+  .protocolo small { display: block; color: var(--fraco); font-size: 11.5px; font-family: var(--corpo); }
+  .protocolo.falhou { border-color: var(--alerta); background: rgba(255,176,32,.05); }
+  .protocolo.falhou b { color: var(--alerta); font-size: 13px; letter-spacing: .02em; }
+
+  .rodape { margin-top: 40px; padding-top: 18px; border-top: 1px solid var(--linha); font-family: var(--mono); font-size: 10.5px; letter-spacing: .06em; color: var(--mudo); text-align: center; text-transform: uppercase; }
+
+  .toast { position: fixed; bottom: 26px; left: 50%; transform: translateX(-50%); background: var(--osso); color: var(--tinta0); padding: 11px 22px; font-family: var(--display); font-size: 13px; letter-spacing: .1em; text-transform: uppercase; font-weight: 600; opacity: 0; transition: opacity .2s; pointer-events: none; z-index: 10; }
+  .toast.ver { opacity: 1; }
+
+  @media (max-width: 640px) {
+    .wrap { padding: 0 16px 70px; }
+    .chips { margin-left: 0; }
+    .etapa span { font-size: 20px; }
+    .veredito .frase { font-size: 20px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="logo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="7"/><path d="M12 1v4M12 19v4M1 12h4M19 12h4"/><circle cx="12" cy="12" r="2.2"/></svg></div>
+    <div class="marca">
+      <h1>Scanner</h1>
+      <p>Filadelfia <b id="versao"></b> &middot; checagem de PC para cheat e ocultacao de rastros</p>
+    </div>
+    <div class="chips" id="chips"></div>
+  </header>
+
+  <div id="aviso-admin" class="aviso oculto"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4m0 4h.01M10.3 3.9L2.5 17.5A2 2 0 004.2 20.5h15.6a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/></svg><span></span></div>
+
+  <section class="painel trava oculto" id="painel-trava">
+    <div class="trava-topo">
+      <span class="cadeado"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="4" y="10" width="16" height="11"/><path d="M8 10V7a4 4 0 018 0v3"/></svg></span>
+      <div>
+        <strong>Este scanner so roda com autorizacao da equipe</strong>
+        <small>Peca o codigo para quem esta te telando. Ele vale uma vez, neste computador, por tempo limitado.</small>
+      </div>
+    </div>
+    <div class="filtros">
+      <input id="codigo-auth" placeholder="FLD-XXXX-XXXX" autocomplete="off" spellcheck="false">
+      <button class="btn primario" id="btn-liberar">Liberar</button>
+    </div>
+    <p class="erro-auth" id="erro-auth"></p>
+  </section>
+
+  <div class="secao-titulo"><h2>Checagem real</h2><span>le o Windows deste computador</span></div>
+  <div class="grid-acoes">
+    <button class="acao destaque" data-modo="completo">
+      <span class="icone"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg></span>
+      <strong>Checagem completa</strong>
+      <small>Le o PC inteiro, ponta a ponta, sem limite de tempo. Nao interrompa: pode levar de 10 a 40 minutos em disco grande.</small>
+    </button>
+    <button class="acao" data-modo="completo" data-rapido="1">
+      <span class="icone"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L4 14h7l-1 8 9-12h-7l1-8z"/></svg></span>
+      <strong>Checagem rapida</strong>
+      <small>Triagem rapida: pula disco, strings, journal e pacotes. Cerca de 2 minutos. Nao serve para inocentar ninguem.</small>
+    </button>
+  </div>
+
+  <div class="secao-titulo"><h2>Busca manual</h2><span>procura um termo em disco, registro, memoria do jogo e journal do NTFS</span></div>
+  <div class="painel" style="margin-top:0">
+    <div class="filtros">
+      <input type="search" id="termo-busca" placeholder="eulen, discord.gg/xxxxx, nome de arquivo, dominio...">
+      <button class="btn primario" id="btn-buscar">Buscar no PC inteiro</button>
+    </div>
+    <div id="resultado-busca" class="oculto"></div>
+  </div>
+
+  <div class="secao-titulo oculto" id="titulo-demo"><h2>Demonstracao</h2><span>uso interno: nao le nada do PC, so mostra como o resultado fica</span></div>
+  <div class="grid-acoes oculto" id="grid-demo">
+    <button class="acao demo d-critico" data-modo="ativo">
+      <span class="icone"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12"/><path d="M8 20h8M12 16v4"/></svg></span>
+      <span class="selo">Demo</span>
+      <strong>Cheat ativo agora</strong>
+      <small>FiveM aberto com loader rodando e dll injetada. Mostra a aba de processos.</small>
+    </button>
+    <button class="acao demo d-critico" data-modo="suspeito">
+      <span class="icone"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4m0 4h.01M10.3 3.9L2.5 17.5A2 2 0 004.2 20.5h15.6a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/></svg></span>
+      <span class="selo">Demo</span>
+      <strong>Cheat + rastros apagados</strong>
+      <small>Cenario completo: cheat encontrado, logs limpos, Defender desligado, Discord e navegador.</small>
+    </button>
+    <button class="acao demo d-critico" data-modo="fechou">
+      <span class="icone"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg></span>
+      <span class="selo">Demo</span>
+      <strong>Fechou o cheat antes</strong>
+      <small>Matou o cheat no Gerenciador antes da telagem. Memoria do jogo e linha do tempo entregam.</small>
+    </button>
+    <button class="acao demo d-alerta" data-modo="rastros">
+      <span class="icone"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v5M14 11v5"/></svg></span>
+      <span class="selo">Demo</span>
+      <strong>So rastros apagados</strong>
+      <small>Nenhum cheat achado, mas logs, Prefetch, historico e Discord limpos antes da checagem.</small>
+    </button>
+    <button class="acao demo d-ok" data-modo="limpo">
+      <span class="icone"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span>
+      <span class="selo">Demo</span>
+      <strong>PC limpo</strong>
+      <small>Cenario sem indicios, para comparar como fica um resultado verde.</small>
+    </button>
+  </div>
+
+  <section class="painel oculto" id="painel-progresso">
+    <div class="progresso-topo">
+      <div class="etapa"><span id="etapa-atual">Preparando...</span><small id="modo-atual"></small></div>
+      <div class="mono" id="etapa-contador">0 / 0</div>
+    </div>
+    <div class="barra"><i id="barra"></i></div>
+    <ul class="stepper" id="lista-etapas"></ul>
+    <div class="atividade" id="atividade"><span class="pulso"></span><span class="texto" id="atividade-texto">Preparando...</span><span class="tempo" id="atividade-tempo"></span></div>
+    <div class="contagem-viva"><span class="c"><b id="viva-c">0</b>criticos</span><span class="a"><b id="viva-a">0</b>alertas</span><span class="i"><b id="viva-i">0</b>informativos</span></div>
+    <div class="ticker" id="ticker"></div>
+    <div class="linha-pular"><button class="pular" id="btn-pular">Pular esta etapa</button><small>A etapa pulada fica marcada como incompleta no relatorio</small></div>
+  </section>
+
+  <section class="painel oculto" id="painel-resultado">
+    <div class="veredito" id="veredito"><span class="selo"></span><div><span class="frase"></span><small></small></div></div>
+    <div class="contadores" id="contadores">
+      <button class="contador c" data-filtro="CRITICO"><b>0</b><span>Criticos</span></button>
+      <button class="contador a" data-filtro="ALERTA"><b>0</b><span>Alertas</span></button>
+      <button class="contador i" data-filtro="INFO"><b>0</b><span>Informativos</span></button>
+      <button class="contador e" data-filtro="ERRO"><b>0</b><span>Erros</span></button>
+    </div>
+
+    <div class="abas">
+      <button class="aba ativa" data-aba="achados">Achados<span class="num" id="num-achados">0</span></button>
+      <button class="aba" data-aba="processos">Processos<span class="num" id="num-processos">0</span></button>
+      <button class="aba" data-aba="sistema">Sistema</button>
+      <button class="aba" data-aba="log">Log completo</button>
+    </div>
+
+    <div id="aba-achados">
+      <div class="filtros" style="margin-bottom:16px">
+        <input type="search" id="busca" placeholder="Filtrar por texto, arquivo, servico, dominio...">
+        <select id="filtro-cat"><option value="">Todas as categorias</option></select>
+        <button class="btn" id="btn-expandir">Expandir tudo</button>
+      </div>
+      <div id="lista-achados"></div>
+    </div>
+
+    <div id="aba-processos" class="oculto">
+      <div class="filtros" style="margin-bottom:16px">
+        <input type="search" id="busca-proc" placeholder="Filtrar processo por nome ou caminho...">
+        <select id="filtro-proc"><option value="">Todos</option><option value="marcados">So marcados (cheat, suspeito, FiveM)</option><option value="cheat">Cheat</option><option value="suspeito">Suspeito</option><option value="fivem">FiveM</option></select>
+      </div>
+      <div class="rolagem"><table class="tabela"><thead><tr><th>PID</th><th>Processo</th><th>Situacao</th><th>Pai</th><th>Caminho</th></tr></thead><tbody id="tabela-processos"></tbody></table></div>
+      <div class="sub-bloco" id="bloco-modulos">
+        <h3>Modulos carregados no FiveM</h3>
+        <div class="rolagem"><table class="tabela"><thead><tr><th>PID</th><th>Modulo</th><th>Situacao</th><th>Caminho</th></tr></thead><tbody id="tabela-modulos"></tbody></table></div>
+      </div>
+    </div>
+
+    <div id="aba-sistema" class="oculto"><div class="rolagem"><table class="tabela"><tbody id="tabela-sistema"></tbody></table></div></div>
+    <div id="aba-log" class="oculto"><pre class="log" id="log-completo"></pre></div>
+
+    <div class="rodape-acoes">
+      <button class="btn primario" id="btn-nova"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M3 12a9 9 0 0115.5-6.3L21 8M21 3v5h-5"/><path d="M21 12a9 9 0 01-15.5 6.3L3 16M3 21v-5h5"/></svg>Nova checagem</button>
+      <button class="btn" id="btn-abrir">Abrir relatorio .txt</button>
+      <button class="btn" id="btn-pasta">Abrir pasta</button>
+      <button class="btn" id="btn-copiar">Copiar resumo</button>
+      <button class="btn" id="btn-baixar">Baixar .txt</button>
+      <button class="btn perigo" id="btn-encerrar">Encerrar scanner</button>
+    </div>
+    <div class="arquivos" id="arquivos"></div>
+  </section>
+
+  <p class="rodape">Um critico e indicio forte, nao prova. Confirme com o jogador antes de banir.</p>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+(function () {
+  const token = new URLSearchParams(location.search).get("t") || "";
+  const api = (caminho, params) => {
+    const u = new URL(caminho, location.origin);
+    u.searchParams.set("t", token);
+    for (const k in (params || {})) u.searchParams.set(k, params[k]);
+    return u.toString();
+  };
+  const $ = (s) => document.querySelector(s);
+  const criar = (tag, cls, txt) => { const e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; };
+  const nomesModo = { completo: "Checagem real", suspeito: "Demonstracao: cheat + rastros apagados", limpo: "Demonstracao: PC limpo", ativo: "Demonstracao: cheat ativo agora", rastros: "Demonstracao: so rastros apagados", fechou: "Demonstracao: fechou o cheat antes da telagem" };
+
+  const estado = { achados: [], sistema: [], linhas: [], etapas: [], processos: [], modulos: [], filtro: null, filtroCat: "", busca: "", buscaProc: "", filtroProc: "", rodando: false, fim: null, expandido: false, replay: false, demo: false, inicioEtapa: 0, ultimoSinal: 0, cont: { CRITICO: 0, ALERTA: 0, INFO: 0 } };
+
+  function toast(msg) {
+    const t = $("#toast");
+    t.textContent = msg;
+    t.classList.add("ver");
+    clearTimeout(t._id);
+    t._id = setTimeout(() => t.classList.remove("ver"), 2400);
+  }
+
+  function marcaSinal(texto) {
+    estado.ultimoSinal = Date.now();
+    if (texto != null) $("#atividade-texto").textContent = texto;
+  }
+
+  setInterval(() => {
+    if (!estado.rodando || !estado.inicioEtapa) return;
+    const s = Math.floor((Date.now() - estado.inicioEtapa) / 1000);
+    const quieto = Math.floor((Date.now() - estado.ultimoSinal) / 1000);
+    const mm = String(Math.floor(s / 60)).padStart(2, "0"), ss = String(s % 60).padStart(2, "0");
+    let rotulo = mm + ":" + ss + " nesta etapa";
+    const caixa = $("#atividade");
+    if (quieto >= 20) { rotulo += " (sem sinal ha " + quieto + "s)"; caixa.classList.add("parado"); }
+    else caixa.classList.remove("parado");
+    $("#atividade-tempo").textContent = rotulo;
+  }, 1000);
+
+  function chip(rotulo, valor, classe) {
+    const c = criar("div", "chip" + (classe ? " " + classe : ""));
+    if (classe) c.appendChild(criar("span", "ponto"));
+    c.appendChild(document.createTextNode(rotulo + " "));
+    c.appendChild(criar("b", null, valor));
+    return c;
+  }
+
+  function montaCabecalho(e) {
+    $("#versao").textContent = e.versao;
+    const chips = $("#chips");
+    chips.innerHTML = "";
+    chips.appendChild(chip("PC", e.maquina));
+    chips.appendChild(chip("Usuario", e.usuario));
+    chips.appendChild(chip("Admin", e.admin ? "sim" : "nao", e.admin ? "bom" : "ruim"));
+    chips.appendChild(chip("Assinaturas", e.total_cheats + " cheats / " + e.total_dominios + " sites / " + e.total_drivers + " drivers"));
+
+    const aviso = $("#aviso-admin");
+    const avisos = [];
+    if (!e.windows) avisos.push("Este binario nao e a versao Windows: as checagens reais estao indisponiveis neste computador.");
+    else if (!e.admin) avisos.push("Rodando sem administrador. Varias checagens vao falhar. Feche e abra como administrador.");
+    if (avisos.length) { aviso.querySelector("span").textContent = avisos.join(" "); aviso.classList.remove("oculto"); }
+    else aviso.classList.add("oculto");
+    if (!e.windows) {
+      document.querySelectorAll('.acao[data-modo="completo"]').forEach((b) => { b.disabled = true; b.dataset.indisponivel = "1"; });
+    }
+    estado.precisaCodigo = !!e.precisa_codigo;
+    estado.autorizado = !e.precisa_codigo || !!e.autorizado;
+    aplicaTrava();
+    estado.demo = !!e.demo;
+    if (estado.demo) mostraDemo();
+  }
+
+  function aplicaTrava() {
+    const travado = estado.precisaCodigo && !estado.autorizado;
+    $("#painel-trava").classList.toggle("oculto", !travado);
+    document.querySelectorAll(".acao").forEach((b) => {
+      if (travado) { b.dataset.travado = "1"; b.disabled = true; }
+      else { delete b.dataset.travado; b.disabled = b.dataset.indisponivel === "1"; }
+    });
+    $("#btn-buscar").disabled = travado;
+    $("#termo-busca").disabled = travado;
+  }
+
+  function liberar() {
+    const campo = $("#codigo-auth");
+    const b = $("#btn-liberar");
+    b.disabled = true;
+    $("#erro-auth").textContent = "";
+    fetch(api("/api/entrar", { codigo: campo.value.trim().toUpperCase() }))
+      .then((r) => r.json())
+      .then((r) => {
+        b.disabled = false;
+        if (!r.ok) { $("#erro-auth").textContent = r.erro; return; }
+        estado.autorizado = true;
+        aplicaTrava();
+        if (r.assinaturas) {
+          const chips = $("#chips").children;
+          for (const c of chips) if (c.textContent.startsWith("Assinaturas")) c.remove();
+        }
+        toast(r.autorizacao || "Scanner liberado");
+      })
+      .catch(() => { b.disabled = false; $("#erro-auth").textContent = "nao consegui falar com o servidor da equipe"; });
+  }
+
+  function mostraDemo() {
+    estado.demo = true;
+    $("#titulo-demo").classList.remove("oculto");
+    $("#grid-demo").classList.remove("oculto");
+  }
+
+  let teclado = "";
+  document.addEventListener("keydown", (e) => {
+    if (estado.demo || e.key.length !== 1) return;
+    teclado = (teclado + e.key.toLowerCase()).slice(-11);
+    if (teclado.endsWith("filadelfia")) {
+      mostraDemo();
+      toast("Modo de demonstracao liberado");
+    }
+  });
+
+  function atualizaVivos() {
+    $("#viva-c").textContent = estado.cont.CRITICO;
+    $("#viva-a").textContent = estado.cont.ALERTA;
+    $("#viva-i").textContent = estado.cont.INFO;
+  }
+
+  function aplicaEvento(ev) {
+    switch (ev.tipo) {
+      case "inicio":
+        estado.achados = []; estado.sistema = []; estado.linhas = []; estado.etapas = []; estado.processos = []; estado.modulos = []; estado.fim = null;
+        estado.cont = { CRITICO: 0, ALERTA: 0, INFO: 0 };
+        $("#lista-etapas").innerHTML = ""; $("#ticker").innerHTML = "";
+        $("#modo-atual").textContent = nomesModo[ev.texto] || ev.texto;
+        atualizaVivos();
+        break;
+      case "etapa": {
+        estado.etapas.push(ev.texto);
+        estado.inicioEtapa = Date.now();
+        marcaSinal("Iniciando: " + ev.texto);
+        $("#etapa-atual").textContent = ev.texto;
+        const bp = $("#btn-pular");
+        bp.disabled = false;
+        bp.textContent = "Pular esta etapa";
+        $("#etapa-contador").textContent = ev.etapa + " / " + ev.total;
+        $("#barra").style.width = Math.round(((ev.etapa - 1) / ev.total) * 100) + "%";
+        const ul = $("#lista-etapas");
+        ul.querySelectorAll("li.atual").forEach((li) => { li.classList.remove("atual"); li.classList.add("feita"); li.querySelector("i").textContent = "✓"; });
+        const li = criar("li", "atual");
+        li.appendChild(criar("i", null, String(ev.etapa)));
+        li.appendChild(criar("span", null, ev.texto));
+        ul.appendChild(li);
+        break;
+      }
+      case "secao":
+        estado.linhas.push("");
+        estado.linhas.push("== " + ev.secao + " ==");
+        empurraTicker(ev.secao, "");
+        marcaSinal(null);
+        break;
+      case "progresso":
+        marcaSinal(ev.texto);
+        break;
+      case "sistema":
+        estado.sistema.push([ev.chave, ev.valor]);
+        estado.linhas.push("  " + ev.chave + ": " + ev.valor);
+        break;
+      case "linha":
+        estado.linhas.push("  " + ev.texto);
+        empurraTicker(ev.texto, "");
+        marcaSinal(null);
+        break;
+      case "ok":
+        estado.linhas.push("  [OK] " + ev.texto);
+        empurraTicker("OK: " + ev.texto, "ok");
+        marcaSinal(null);
+        break;
+      case "falha":
+        estado.linhas.push("  [erro] " + ev.texto);
+        empurraTicker("erro: " + ev.texto, "");
+        marcaSinal(null);
+        break;
+      case "processo":
+        estado.processos.push({ pid: ev.etapa, nome: ev.chave, caminho: ev.valor, situacao: ev.texto || "", pai: ev.detalhe || "" });
+        break;
+      case "modulo":
+        estado.modulos.push({ pid: ev.etapa, nome: ev.chave, caminho: ev.valor, situacao: ev.texto || "" });
+        break;
+      case "achado":
+        marcaSinal(null);
+        estado.achados.push(ev);
+        estado.cont[ev.severidade] = (estado.cont[ev.severidade] || 0) + 1;
+        atualizaVivos();
+        estado.linhas.push("  [" + ev.severidade + "] " + ev.titulo);
+        if (ev.detalhe) estado.linhas.push("        " + ev.detalhe.replace(/\n/g, "\n        "));
+        empurraTicker("[" + ev.severidade + "] " + ev.titulo, ev.severidade);
+        break;
+      case "fim":
+        estado.fim = JSON.parse(ev.texto);
+        finaliza();
+        break;
+    }
+  }
+
+  function empurraTicker(texto, classe) {
+    const t = $("#ticker");
+    t.insertBefore(criar("div", classe, texto), t.firstChild);
+    while (t.children.length > 5) t.removeChild(t.lastChild);
+  }
+
+  function finaliza() {
+    estado.rodando = false;
+    const f = estado.fim;
+    $("#barra").style.width = "100%";
+    $("#painel-progresso").classList.add("oculto");
+    $("#painel-resultado").classList.remove("oculto");
+    aplicaTrava();
+    document.title = (f.criticos > 0 ? "! " : (f.alertas > 0 ? "? " : "OK ")) + "Scanner Filadelfia";
+
+    const v = $("#veredito");
+    const classe = f.criticos > 0 ? "critico" : (f.alertas > 0 ? "alerta" : "ok");
+    v.className = "veredito " + classe;
+    v.querySelector(".selo").textContent = classe === "critico" ? "!" : (classe === "alerta" ? "?" : "✓");
+    v.querySelector(".frase").textContent = f.veredito;
+    v.querySelector("small").textContent = "Analise concluida em " + f.duracao + ". " + estado.achados.length + " achados, " + estado.processos.length + " processos listados.";
+
+    const cont = $("#contadores").children;
+    cont[0].querySelector("b").textContent = f.criticos;
+    cont[1].querySelector("b").textContent = f.alertas;
+    cont[2].querySelector("b").textContent = f.infos;
+    cont[3].querySelector("b").textContent = f.erros;
+    $("#num-achados").textContent = estado.achados.length;
+    $("#num-processos").textContent = estado.processos.length;
+
+    $("#arquivos").innerHTML = "";
+    if (f.protocolo) {
+      const caixa = criar("div", "protocolo");
+      caixa.appendChild(criar("small", null, "Este relatorio foi entregue para a equipe. Protocolo:"));
+      caixa.appendChild(criar("b", null, f.protocolo));
+      caixa.appendChild(criar("small", null, "A equipe abre o resultado completo pelo painel, sem precisar do seu PC."));
+      $("#arquivos").appendChild(caixa);
+    } else if (f.erro_envio) {
+      const caixa = criar("div", "protocolo falhou");
+      caixa.appendChild(criar("small", null, "Nao consegui entregar o relatorio para a equipe:"));
+      caixa.appendChild(criar("b", null, f.erro_envio));
+      caixa.appendChild(criar("small", null, "Mande o arquivo abaixo para quem esta te telando."));
+      $("#arquivos").appendChild(caixa);
+    }
+    if (f.caminho_txt) {
+      $("#arquivos").appendChild(criar("div", "mono", "TXT: " + f.caminho_txt));
+      $("#arquivos").appendChild(criar("div", "mono", "JSON: " + f.caminho_js));
+    }
+    montaCategorias();
+    desenhaSistema();
+    desenhaLog();
+    desenhaProcessos();
+    desenhaAchados();
+    if (estado.replay) return;
+    if (f.erros > 0) toast(f.erros + " checagem(ns) falharam. Veja a aba Log completo.");
+    $("#painel-resultado").scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  function montaCategorias() {
+    const sel = $("#filtro-cat");
+    const atual = estado.filtroCat;
+    sel.innerHTML = "";
+    sel.appendChild(new Option("Todas as categorias", ""));
+    const cats = [];
+    for (const a of estado.achados) if (!cats.includes(a.secao)) cats.push(a.secao);
+    for (const c of cats) sel.appendChild(new Option(c, c));
+    sel.value = cats.includes(atual) ? atual : "";
+    estado.filtroCat = sel.value;
+  }
+
+  function desenhaAchados() {
+    const alvo = $("#lista-achados");
+    alvo.innerHTML = "";
+    const busca = estado.busca.toLowerCase();
+    const lista = estado.achados.filter((a) => {
+      if (estado.filtro === "ERRO") return false;
+      if (estado.filtro && a.severidade !== estado.filtro) return false;
+      if (estado.filtroCat && a.secao !== estado.filtroCat) return false;
+      if (!busca) return true;
+      return (a.titulo + " " + (a.detalhe || "") + " " + a.secao).toLowerCase().includes(busca);
+    });
+    const peso = { CRITICO: 0, ALERTA: 1, INFO: 2 };
+    lista.sort((a, b) => peso[a.severidade] - peso[b.severidade]);
+
+    if (!lista.length) {
+      alvo.appendChild(criar("div", "vazio", estado.achados.length ? "Nenhum achado para este filtro." : "Nenhum achado. PC sem indicios."));
+      return;
+    }
+    let ultimaSev = null;
+    for (const a of lista) {
+      if (a.severidade !== ultimaSev) {
+        ultimaSev = a.severidade;
+        const rotulo = { CRITICO: "Criticos: indicio forte", ALERTA: "Alertas: precisam de olho humano", INFO: "Informativos: contexto" }[a.severidade];
+        alvo.appendChild(criar("div", "grupo-cat", rotulo));
+      }
+      const d = criar("details", "achado " + a.severidade);
+      d.open = estado.expandido;
+      const s = criar("summary");
+      s.appendChild(criar("span", "tag", a.severidade));
+      const t = criar("span", "titulo", a.titulo);
+      t.appendChild(criar("small", null, a.secao));
+      s.appendChild(t);
+      s.appendChild(criar("span", "seta", "▶"));
+      d.appendChild(s);
+      if (a.detalhe) d.appendChild(criar("pre", null, a.detalhe));
+      else d.appendChild(criar("div", "semdetalhe", "Sem detalhe adicional."));
+      if (a.caminhos && a.caminhos.length) d.appendChild(barraDeCaminhos(a.caminhos));
+      alvo.appendChild(d);
+    }
+  }
+
+  const svgPasta = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>';
+  const svgCopiar = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 012-2h10"/></svg>';
+
+  function barraDeCaminhos(caminhos) {
+    const barra = criar("div", "caminhos");
+    for (const caminho of caminhos) {
+      const abrir = criar("button", "caminho-btn");
+      abrir.innerHTML = svgPasta + "<span></span>";
+      abrir.querySelector("span").textContent = "Abrir " + caminho.split("\\").pop();
+      abrir.title = "Abrir a pasta e selecionar: " + caminho;
+      abrir.addEventListener("click", (ev) => {
+        ev.preventDefault(); ev.stopPropagation();
+        fetch(api("/api/revelar", { caminho: caminho })).then((r) => r.json()).then((r) => {
+          toast(r.ok ? (r.aviso || "Pasta aberta no Explorer") : r.erro);
+        }).catch(() => toast("Nao consegui abrir a pasta"));
+      });
+      barra.appendChild(abrir);
+
+      const copiar = criar("button", "caminho-btn copiar");
+      copiar.innerHTML = svgCopiar + "<span>Copiar caminho</span>";
+      copiar.title = caminho;
+      copiar.addEventListener("click", (ev) => {
+        ev.preventDefault(); ev.stopPropagation();
+        copiaTexto(caminho).then(() => toast("Caminho copiado"), () => toast("Nao consegui copiar"));
+      });
+      barra.appendChild(copiar);
+    }
+    return barra;
+  }
+
+  function desenhaProcessos() {
+    const tb = $("#tabela-processos");
+    tb.innerHTML = "";
+    const busca = estado.buscaProc.toLowerCase();
+    const peso = { cheat: 0, suspeito: 1, fivem: 2, "": 3 };
+    const lista = estado.processos.filter((p) => {
+      if (estado.filtroProc === "marcados" && !p.situacao) return false;
+      if (estado.filtroProc && estado.filtroProc !== "marcados" && p.situacao !== estado.filtroProc) return false;
+      if (!busca) return true;
+      return (p.nome + " " + p.caminho + " " + p.pai).toLowerCase().includes(busca);
+    }).sort((a, b) => (peso[a.situacao] - peso[b.situacao]) || a.nome.localeCompare(b.nome));
+    if (!lista.length) {
+      const tr = criar("tr"); const td = criar("td", "vazio", estado.processos.length ? "Nenhum processo para este filtro." : "Lista de processos indisponivel nesta checagem."); td.colSpan = 5; tr.appendChild(td); tb.appendChild(tr);
+    }
+    for (const p of lista) {
+      const tr = criar("tr", p.situacao);
+      tr.appendChild(criar("td", "mono", String(p.pid)));
+      tr.appendChild(criar("td", null, p.nome));
+      const td = criar("td");
+      if (p.situacao) td.appendChild(criar("span", "tag-mini " + p.situacao, p.situacao.toUpperCase()));
+      tr.appendChild(td);
+      tr.appendChild(criar("td", null, p.pai || ""));
+      tr.appendChild(criar("td", "mono", p.caminho || "(protegido / sem acesso)"));
+      tb.appendChild(tr);
+    }
+    const tm = $("#tabela-modulos");
+    tm.innerHTML = "";
+    $("#bloco-modulos").classList.toggle("oculto", !estado.modulos.length);
+    const mods = estado.modulos.slice().sort((a, b) => (peso[a.situacao] - peso[b.situacao]) || a.nome.localeCompare(b.nome));
+    for (const m of mods) {
+      const tr = criar("tr", m.situacao);
+      tr.appendChild(criar("td", "mono", String(m.pid)));
+      tr.appendChild(criar("td", null, m.nome));
+      const td = criar("td");
+      if (m.situacao) td.appendChild(criar("span", "tag-mini " + m.situacao, m.situacao.toUpperCase()));
+      tr.appendChild(td);
+      tr.appendChild(criar("td", "mono", m.caminho));
+      tm.appendChild(tr);
+    }
+  }
+
+  function desenhaSistema() {
+    const t = $("#tabela-sistema");
+    t.innerHTML = "";
+    for (const [k, v] of estado.sistema) {
+      const tr = criar("tr");
+      tr.appendChild(criar("td", null, k));
+      tr.appendChild(criar("td", "mono", v));
+      t.appendChild(tr);
+    }
+    if (!estado.sistema.length) {
+      const tr = criar("tr"); const td = criar("td", "vazio", "Sem dados de sistema."); td.colSpan = 2; tr.appendChild(td); t.appendChild(tr);
+    }
+  }
+
+  function desenhaLog() { $("#log-completo").textContent = estado.linhas.join("\n"); }
+
+  function copiaTexto(texto) {
+    if (navigator.clipboard && window.isSecureContext) return navigator.clipboard.writeText(texto).catch(() => copiaFallback(texto));
+    return copiaFallback(texto);
+  }
+  function copiaFallback(texto) {
+    return new Promise((ok, falha) => {
+      const ta = document.createElement("textarea");
+      ta.value = texto; ta.style.position = "fixed"; ta.style.opacity = "0";
+      document.body.appendChild(ta); ta.select();
+      let deu = false;
+      try { deu = document.execCommand("copy"); } catch (e) { deu = false; }
+      document.body.removeChild(ta);
+      deu ? ok() : falha();
+    });
+  }
+
+  function inicia(modo, rapido) {
+    estado.rodando = true;
+    estado.inicioEtapa = Date.now();
+    marcaSinal("Preparando...");
+    estado.filtro = null; estado.filtroCat = ""; estado.busca = ""; estado.buscaProc = ""; estado.filtroProc = "";
+    $("#busca").value = ""; $("#busca-proc").value = ""; $("#filtro-proc").value = "";
+    document.title = "Scanner Filadelfia";
+    document.querySelectorAll(".contador").forEach((c) => c.classList.remove("ativo"));
+    document.querySelectorAll(".acao").forEach((b) => { b.disabled = true; });
+    $("#painel-resultado").classList.add("oculto");
+    $("#painel-progresso").classList.remove("oculto");
+    $("#barra").style.width = "0%";
+    $("#etapa-atual").textContent = "Preparando...";
+    $("#btn-pular").disabled = false;
+    $("#btn-pular").textContent = "Pular esta etapa";
+    $("#modo-atual").textContent = nomesModo[modo] || modo;
+    $("#painel-progresso").scrollIntoView({ behavior: "smooth", block: "start" });
+    fetch(api("/api/iniciar", { modo: modo, rapido: rapido ? "1" : "0" }))
+      .then((r) => r.json())
+      .then((r) => { if (!r.ok) { toast(r.erro); aplicaTrava(); } });
+  }
+
+  document.querySelectorAll(".acao").forEach((b) => {
+    b.addEventListener("click", () => { if (!b.disabled) inicia(b.dataset.modo, b.dataset.rapido === "1"); });
+  });
+  document.querySelectorAll(".contador").forEach((c) => {
+    c.addEventListener("click", () => {
+      const jaAtivo = c.classList.contains("ativo");
+      document.querySelectorAll(".contador").forEach((x) => x.classList.remove("ativo"));
+      estado.filtro = jaAtivo ? null : c.dataset.filtro;
+      if (!jaAtivo) c.classList.add("ativo");
+      document.querySelectorAll(".aba").forEach((x) => x.classList.toggle("ativa", x.dataset.aba === "achados"));
+      for (const nome of ["achados", "processos", "sistema", "log"]) $("#aba-" + nome).classList.toggle("oculto", nome !== "achados");
+      desenhaAchados();
+    });
+  });
+  document.querySelectorAll(".aba").forEach((a) => {
+    a.addEventListener("click", () => {
+      document.querySelectorAll(".aba").forEach((x) => x.classList.remove("ativa"));
+      a.classList.add("ativa");
+      for (const nome of ["achados", "processos", "sistema", "log"]) $("#aba-" + nome).classList.toggle("oculto", nome !== a.dataset.aba);
+    });
+  });
+  function desenhaBusca(res) {
+    const alvo = $("#resultado-busca");
+    alvo.classList.remove("oculto");
+    alvo.innerHTML = "";
+    const blocos = [["Arquivos e pastas", res.Arquivos], ["Registro do Windows", res.Registro], ["Memoria do jogo", res.Memoria], ["Journal do disco (inclui apagados)", res.Journal]];
+    let total = 0;
+    for (const [nome, lista] of blocos) {
+      if (!lista || !lista.length) continue;
+      total += lista.length;
+      alvo.appendChild(criar("div", "grupo-cat", nome + " (" + lista.length + ")"));
+      const pre = criar("pre", "log", lista.join("\n"));
+      pre.style.maxHeight = "260px";
+      alvo.appendChild(pre);
+    }
+    if (!total) alvo.appendChild(criar("div", "vazio", "Nada encontrado para \"" + res.Termo + "\" em disco, registro, memoria ou journal."));
+  }
+
+  $("#btn-buscar").addEventListener("click", () => {
+    const termo = $("#termo-busca").value.trim();
+    if (termo.length < 3) { toast("Digite pelo menos 3 letras"); return; }
+    const botao = $("#btn-buscar");
+    botao.disabled = true; botao.textContent = "Procurando no PC inteiro...";
+    $("#resultado-busca").classList.remove("oculto");
+    $("#resultado-busca").innerHTML = '<div class="vazio">Procurando em todos os discos, registro, memoria do jogo e journal do NTFS. Pode levar alguns minutos.</div>';
+    fetch(api("/api/buscar", { termo: termo })).then((r) => r.json()).then((r) => {
+      botao.disabled = false; botao.textContent = "Buscar no PC inteiro";
+      if (!r.ok) { toast(r.erro); $("#resultado-busca").innerHTML = '<div class="vazio">' + r.erro + "</div>"; return; }
+      desenhaBusca(r.resultado);
+    }).catch(() => { botao.disabled = false; botao.textContent = "Buscar no PC inteiro"; toast("A busca falhou"); });
+  });
+  $("#termo-busca").addEventListener("keydown", (e) => { if (e.key === "Enter") $("#btn-buscar").click(); });
+
+  $("#busca").addEventListener("input", (e) => { estado.busca = e.target.value; desenhaAchados(); });
+  $("#filtro-cat").addEventListener("change", (e) => { estado.filtroCat = e.target.value; desenhaAchados(); });
+  $("#busca-proc").addEventListener("input", (e) => { estado.buscaProc = e.target.value; desenhaProcessos(); });
+  $("#filtro-proc").addEventListener("change", (e) => { estado.filtroProc = e.target.value; desenhaProcessos(); });
+  $("#btn-expandir").addEventListener("click", () => {
+    estado.expandido = !estado.expandido;
+    $("#btn-expandir").textContent = estado.expandido ? "Recolher tudo" : "Expandir tudo";
+    desenhaAchados();
+  });
+  $("#btn-nova").addEventListener("click", () => {
+    $("#painel-resultado").classList.add("oculto");
+    aplicaTrava();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  });
+  $("#btn-liberar").addEventListener("click", liberar);
+  $("#codigo-auth").addEventListener("keydown", (e) => { if (e.key === "Enter") liberar(); });
+
+  $("#btn-pular").addEventListener("click", () => {
+    const b = $("#btn-pular");
+    b.disabled = true;
+    b.textContent = "Pulando...";
+    fetch(api("/api/pular")).then((r) => r.json()).then((r) => {
+      toast(r.ok ? "Etapa pulada, seguindo para a proxima" : r.erro);
+    }).catch(() => toast("Nao consegui pular"));
+  });
+
+  $("#btn-abrir").addEventListener("click", () => fetch(api("/api/abrir")).then((r) => r.json()).then((r) => toast(r.ok ? "Relatorio aberto" : r.erro)));
+  $("#btn-pasta").addEventListener("click", () => fetch(api("/api/abrir", { alvo: "pasta" })).then((r) => r.json()).then((r) => toast(r.ok ? "Pasta aberta" : r.erro)));
+  $("#btn-baixar").addEventListener("click", () => { location.href = api("/api/relatorio.txt"); });
+  $("#btn-copiar").addEventListener("click", () => {
+    const f = estado.fim || {};
+    const linhas = ["SCANNER FILADELFIA - " + (f.veredito || ""), "Criticos: " + f.criticos + "  Alertas: " + f.alertas + "  Informativos: " + f.infos, ""];
+    for (const a of estado.achados) { if (a.severidade !== "INFO") linhas.push("[" + a.severidade + "] (" + a.secao + ") " + a.titulo); }
+    copiaTexto(linhas.join("\n")).then(() => toast("Resumo copiado"), () => toast("Nao foi possivel copiar. Use Baixar .txt"));
+  });
+  $("#btn-encerrar").addEventListener("click", () => {
+    if (!confirm("Encerrar o scanner? A janela do programa vai fechar.")) return;
+    fetch(api("/api/sair")).then(() => { document.body.innerHTML = '<div class="wrap"><div class="painel"><h2>Encerrado</h2><p>O scanner foi fechado. Pode fechar esta aba.</p></div></div>'; });
+  });
+
+  fetch(api("/api/estado")).then((r) => r.json()).then((e) => {
+    montaCabecalho(e);
+    estado.replay = true;
+    (e.historico || []).forEach(aplicaEvento);
+    estado.replay = false;
+    if (e.rodando) {
+      estado.rodando = true;
+      document.querySelectorAll(".acao").forEach((b) => { b.disabled = true; });
+      $("#painel-progresso").classList.remove("oculto");
+    }
+  });
+
+  const fonte = new EventSource(api("/api/eventos"));
+  fonte.onmessage = (m) => { aplicaEvento(JSON.parse(m.data)); };
+})();
+</script>
+</body>
+</html>

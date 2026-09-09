@@ -1,0 +1,6 @@
+dist/
+telador
+telador.exe
+servidor/servidor
+servidor/dist/
+assinaturas.json

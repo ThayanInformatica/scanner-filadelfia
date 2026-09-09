@@ -1,0 +1,396 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Relatorio - Scanner Filadelfia</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+  :root {
+    --tinta0: #08090a; --tinta1: #0e1013; --tinta2: #14171b; --tinta3: #1b1f25;
+    --linha: #23272e; --linha2: #333943;
+    --osso: #edeff2; --texto: #dfe3e8; --fraco: #98a0ab; --mudo: #5f6773;
+    --critico: #ff4438; --alerta: #ffb020; --info: #5aa9ff; --ok: #46d17f;
+    --display: "Barlow Condensed", "Bahnschrift Condensed", "Bahnschrift", "Arial Narrow", sans-serif;
+    --corpo: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, sans-serif;
+    --mono: "IBM Plex Mono", "Cascadia Mono", "Consolas", ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--tinta0); color: var(--texto); min-height: 100vh;
+    font: 14px/1.55 var(--corpo); -webkit-font-smoothing: antialiased;
+  }
+  body::before {
+    content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 3;
+    background: repeating-linear-gradient(0deg, rgba(255,255,255,.02) 0 1px, transparent 1px 3px);
+    mix-blend-mode: screen;
+  }
+  body::after {
+    content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 2;
+    background: radial-gradient(150% 110% at 50% 0%, transparent 60%, rgba(0,0,0,.32) 100%);
+  }
+  code, .mono { font-family: var(--mono); }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 0 26px 90px; position: relative; z-index: 1; }
+  .oculto { display: none !important; }
+  ::selection { background: var(--osso); color: var(--tinta0); }
+  header { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; padding: 20px 0 18px; border-bottom: 1px solid var(--linha); }
+  .logo { width: 36px; height: 36px; border: 1px solid var(--osso); display: grid; place-items: center; flex: none; position: relative; }
+  .logo::after { content: ""; position: absolute; inset: -4px; border: 1px solid var(--linha2); }
+  .logo svg { width: 20px; height: 20px; stroke: var(--osso); }
+  .marca h1 { margin: 0; font-family: var(--display); font-size: 24px; font-weight: 600; letter-spacing: .34em; text-transform: uppercase; line-height: 1; }
+  .marca p { margin: 5px 0 0; color: var(--mudo); font-family: var(--mono); font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; }
+  .marca p b { color: var(--fraco); font-weight: 500; }
+  .chips { display: flex; flex-wrap: wrap; margin-left: auto; border: 1px solid var(--linha); }
+  .chip { display: inline-flex; align-items: center; gap: 7px; padding: 7px 13px; font-family: var(--mono); font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--mudo); border-right: 1px solid var(--linha); }
+  .chip:last-child { border-right: 0; }
+  .chip b { color: var(--texto); font-weight: 600; }
+  .painel { background: var(--tinta1); border: 1px solid var(--linha); padding: 20px; margin-top: 18px; }
+  .secao-titulo { display: flex; align-items: center; gap: 14px; margin: 4px 0 16px; }
+  .secao-titulo h2 { margin: 0; font-family: var(--display); font-size: 15px; letter-spacing: .22em; text-transform: uppercase; color: var(--osso); font-weight: 600; white-space: nowrap; }
+  .secao-titulo span { font-size: 11.5px; color: var(--mudo); }
+  .secao-titulo::after { content: ""; flex: 1; height: 1px; background: var(--linha); }
+  label { display: block; font-family: var(--mono); font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--mudo); margin-bottom: 6px; }
+  input, select { width: 100%; background: var(--tinta0); border: 1px solid var(--linha); color: var(--texto); padding: 11px 13px; font-size: 13.5px; font-family: inherit; border-radius: 0; }
+  input:focus, select:focus { outline: none; border-color: var(--osso); }
+  input::placeholder { color: var(--mudo); }
+  .btn { background: transparent; border: 1px solid var(--linha2); color: var(--texto); padding: 11px 18px; font-family: var(--display); font-size: 13.5px; letter-spacing: .12em; text-transform: uppercase; font-weight: 600; cursor: pointer; transition: background .15s, border-color .15s; }
+  .btn:hover:not(:disabled) { border-color: var(--osso); background: var(--tinta3); }
+  .btn.primario { background: var(--osso); color: var(--tinta0); border-color: var(--osso); }
+  .btn.primario:hover:not(:disabled) { background: #fff; }
+  .btn:disabled { opacity: .4; cursor: default; }
+  .abas { display: flex; gap: 24px; border-bottom: 1px solid var(--linha); margin: 26px 0 0; flex-wrap: wrap; }
+  .aba { background: none; border: 0; border-bottom: 2px solid transparent; color: var(--mudo); padding: 11px 0; margin-bottom: -1px; font-family: var(--display); font-size: 14px; letter-spacing: .14em; text-transform: uppercase; font-weight: 600; cursor: pointer; }
+  .aba:hover { color: var(--fraco); }
+  .aba.ativa { color: var(--osso); border-bottom-color: var(--osso); }
+  .aba .num { margin-left: 7px; font-family: var(--mono); font-size: 10px; color: var(--mudo); letter-spacing: 0; }
+  .rolagem { overflow-x: auto; border: 1px solid var(--linha); }
+  table { width: 100%; border-collapse: collapse; font-size: 12.5px; min-width: 700px; }
+  th { text-align: left; font-family: var(--mono); font-size: 9.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--mudo); padding: 10px 12px; border-bottom: 1px solid var(--linha); font-weight: 600; background: var(--tinta2); }
+  td { padding: 11px 12px; border-bottom: 1px solid rgba(35,39,46,.7); vertical-align: middle; }
+  tr:last-child td { border-bottom: 0; }
+  td.mono { font-family: var(--mono); font-size: 11px; color: var(--fraco); }
+  .vazio { padding: 40px; text-align: center; color: var(--mudo); font-family: var(--mono); font-size: 12px; }
+  .entrada { max-width: 380px; margin: 14vh auto 0; }
+  .erro { color: var(--critico); font-family: var(--mono); font-size: 11.5px; min-height: 16px; margin: 10px 0 0; }
+  .toast { position: fixed; bottom: 26px; left: 50%; transform: translateX(-50%); background: var(--osso); color: var(--tinta0); padding: 11px 22px; font-family: var(--display); font-size: 13px; letter-spacing: .1em; text-transform: uppercase; font-weight: 600; opacity: 0; transition: opacity .2s; pointer-events: none; z-index: 10; }
+  .toast.vis { opacity: 1; }
+  .filtros { display: flex; gap: 10px; flex-wrap: wrap; }
+  .filtros input { flex: 1; min-width: 200px; }
+  .filtros select { width: auto; min-width: 180px; }
+
+  .veredito { display: flex; gap: 20px; align-items: center; padding: 22px; border: 2px solid var(--linha2); margin-bottom: 20px; }
+  .veredito .selo { width: 54px; height: 54px; display: grid; place-items: center; font-family: var(--display); font-size: 30px; font-weight: 700; border: 2px solid currentColor; flex: none; }
+  .veredito .frase { display: block; font-family: var(--display); font-size: 25px; letter-spacing: .05em; text-transform: uppercase; line-height: 1.15; }
+  .veredito small { display: block; color: var(--mudo); font-size: 12px; margin-top: 6px; }
+  .veredito.critico { border-color: var(--critico); background: rgba(255,68,56,.05); }
+  .veredito.critico .selo, .veredito.critico .frase { color: var(--critico); }
+  .veredito.alerta { border-color: var(--alerta); background: rgba(255,176,32,.05); }
+  .veredito.alerta .selo, .veredito.alerta .frase { color: var(--alerta); }
+  .veredito.ok { border-color: var(--ok); background: rgba(70,209,127,.05); }
+  .veredito.ok .selo, .veredito.ok .frase { color: var(--ok); }
+  .contadores { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 1px; background: var(--linha); border: 1px solid var(--linha); margin-bottom: 20px; }
+  .contador { background: var(--tinta1); border: 0; padding: 16px 18px; cursor: pointer; text-align: left; font-family: inherit; color: var(--texto); }
+  .contador:hover { background: var(--tinta2); }
+  .contador b { display: block; font-family: var(--display); font-size: 34px; font-weight: 600; line-height: 1; font-variant-numeric: tabular-nums; }
+  .contador span { display: block; font-family: var(--mono); font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: var(--mudo); margin-top: 7px; }
+  .contador.c b { color: var(--critico); }
+  .contador.a b { color: var(--alerta); }
+  .contador.i b { color: var(--info); }
+  .contador.e b { color: var(--fraco); }
+  .contador.ativo { background: var(--tinta3); box-shadow: inset 0 2px 0 var(--osso); }
+  .grupo-cat { font-family: var(--mono); font-size: 10px; letter-spacing: .18em; text-transform: uppercase; color: var(--mudo); margin: 22px 0 9px; padding-bottom: 7px; border-bottom: 1px solid var(--linha); }
+  .achado { border-left: 3px solid var(--linha2); background: var(--tinta1); margin-bottom: 2px; }
+  .achado summary { display: flex; align-items: flex-start; gap: 12px; padding: 12px 15px; cursor: pointer; list-style: none; }
+  .achado summary::-webkit-details-marker { display: none; }
+  .achado summary:hover { background: var(--tinta2); }
+  .achado .tag { font-family: var(--mono); font-size: 9.5px; font-weight: 600; letter-spacing: .12em; padding: 3px 7px; border: 1px solid currentColor; flex: none; margin-top: 1px; }
+  .achado .titulo { flex: 1; font-size: 13.5px; font-weight: 600; }
+  .achado .titulo small { display: block; font-family: var(--mono); color: var(--mudo); font-weight: 400; font-size: 10px; letter-spacing: .1em; text-transform: uppercase; margin-top: 4px; }
+  .achado .seta { color: var(--mudo); font-size: 9px; transition: transform .16s; margin-top: 4px; }
+  .achado[open] .seta { transform: rotate(90deg); }
+  .achado.CRITICO { border-left-color: var(--critico); }
+  .achado.CRITICO .tag { color: var(--critico); }
+  .achado.ALERTA { border-left-color: var(--alerta); }
+  .achado.ALERTA .tag { color: var(--alerta); }
+  .achado.INFO .tag { color: var(--info); }
+  .achado pre { margin: 0; padding: 2px 15px 15px 50px; white-space: pre-wrap; word-break: break-word; font-family: var(--mono); font-size: 11.5px; line-height: 1.6; color: var(--fraco); }
+  .achado .semdetalhe { padding: 2px 15px 15px 50px; color: var(--mudo); font-family: var(--mono); font-size: 11.5px; }
+  .caminhos { display: flex; flex-wrap: wrap; gap: 7px; padding: 0 15px 15px 50px; }
+  .caminhos button { background: var(--tinta2); border: 1px solid var(--linha2); color: var(--fraco); padding: 6px 11px; font-family: var(--mono); font-size: 10.5px; cursor: pointer; }
+  .caminhos button:hover { color: var(--osso); border-color: var(--osso); }
+  table.tabela { min-width: 700px; }
+  .marca-cheat { color: var(--critico); font-weight: 600; }
+  .marca-suspeito { color: var(--alerta); font-weight: 600; }
+  .grade-sistema { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1px; background: var(--linha); border: 1px solid var(--linha); }
+  .item-sistema { background: var(--tinta1); padding: 12px 14px; }
+  .item-sistema b { display: block; font-family: var(--mono); font-size: 9.5px; color: var(--mudo); text-transform: uppercase; letter-spacing: .12em; font-weight: 600; margin-bottom: 4px; }
+  .item-sistema span { font-size: 13px; word-break: break-word; }
+  .aviso { margin-top: 16px; padding: 13px 16px; font-size: 12.5px; color: var(--alerta); border: 1px solid rgba(255,176,32,.35); background: rgba(255,176,32,.05); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="logo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="7"/><path d="M12 1v4M12 19v4M1 12h4M19 12h4"/><circle cx="12" cy="12" r="2.2"/></svg></div>
+    <div class="marca">
+      <h1>SCANNER</h1>
+      <p>Filadelfia &middot; relatorio <b class="mono" id="protocolo"></b></p>
+    </div>
+    <div class="chips" id="chips"></div>
+  </header>
+
+  <section class="painel entrada" id="tela-login">
+    <label for="senha">Senha da equipe</label>
+    <input id="senha" type="password" autocomplete="current-password">
+    <p class="erro" id="erro-login"></p>
+    <button class="btn primario" id="btn-entrar" style="margin-top:10px">Entrar</button>
+  </section>
+
+  <div id="conteudo" class="oculto">
+    <section class="painel">
+      <div class="veredito" id="veredito"><span class="selo"></span><div><span class="frase"></span><small></small></div></div>
+      <div class="contadores" id="contadores">
+        <button class="contador c" data-filtro="CRITICO"><b>0</b><span>Criticos</span></button>
+        <button class="contador a" data-filtro="ALERTA"><b>0</b><span>Alertas</span></button>
+        <button class="contador i" data-filtro="INFO"><b>0</b><span>Informativos</span></button>
+        <button class="contador e" data-filtro="ERRO"><b>0</b><span>Erros</span></button>
+      </div>
+      <div id="aviso-incompletas" class="aviso oculto"></div>
+
+      <div class="abas" style="margin-top:16px">
+        <button class="aba ativa" data-aba="achados">Achados<span class="num" id="num-achados">0</span></button>
+        <button class="aba" data-aba="processos">Processos<span class="num" id="num-processos">0</span></button>
+        <button class="aba" data-aba="sistema">Sistema</button>
+      </div>
+
+      <div id="aba-achados">
+        <div class="filtros">
+          <input type="search" id="busca" placeholder="Filtrar por texto, arquivo, servico, dominio...">
+          <select id="filtro-cat"><option value="">Todas as categorias</option></select>
+          <button class="btn" id="btn-expandir">Expandir tudo</button>
+        </div>
+        <div id="lista-achados"></div>
+      </div>
+
+      <div id="aba-processos" class="oculto">
+        <div class="filtros"><input type="search" id="busca-proc" placeholder="Filtrar processo por nome ou caminho..."></div>
+        <div class="rolagem"><table class="tabela"><thead><tr><th>PID</th><th>Processo</th><th>Situacao</th><th>Pai</th><th>Caminho</th></tr></thead><tbody id="tabela-processos"></tbody></table></div>
+      </div>
+
+      <div id="aba-sistema" class="oculto"><div class="grade-sistema" id="grade-sistema"></div></div>
+    </section>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+  const $ = (s) => document.querySelector(s);
+  const protocolo = decodeURIComponent(location.pathname.replace(/^\/r\/?/, "")).toUpperCase();
+  const estado = { achados: [], processos: [], erros: [], filtro: "", filtroCat: "", busca: "", buscaProc: "", expandido: false };
+  const pede = (rota, corpo) => fetch(rota, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(corpo || {}) }).then((r) => r.json());
+
+  function criar(tag, classe, texto) {
+    const e = document.createElement(tag);
+    if (classe) e.className = classe;
+    if (texto != null) e.textContent = texto;
+    return e;
+  }
+  let tempoToast;
+  function toast(t) {
+    const e = $("#toast");
+    e.textContent = t; e.classList.add("vis");
+    clearTimeout(tempoToast);
+    tempoToast = setTimeout(() => e.classList.remove("vis"), 2200);
+  }
+  function chip(rotulo, valor) {
+    const c = criar("span", "chip", rotulo + " ");
+    c.appendChild(criar("b", null, valor));
+    return c;
+  }
+
+  function carrega() {
+    pede("/painel/relatorio", { protocolo: protocolo }).then((r) => {
+      if (!r.ok) { $("#erro-login").textContent = r.erro || "nao consegui abrir"; return; }
+      $("#tela-login").classList.add("oculto");
+      $("#conteudo").classList.remove("oculto");
+      desenha(r.resumo, r.relatorio);
+    });
+  }
+
+  function entrar() {
+    pede("/painel/entrar", { senha: $("#senha").value }).then((r) => {
+      if (!r.ok) { $("#erro-login").textContent = r.erro || "nao consegui entrar"; return; }
+      carrega();
+    });
+  }
+
+  function desenha(resumo, rel) {
+    $("#protocolo").textContent = resumo.protocolo;
+    document.title = resumo.protocolo + " - " + (resumo.maquina || "relatorio");
+    const chips = $("#chips");
+    chips.innerHTML = "";
+    if (resumo.jogador) chips.appendChild(chip("Jogador", resumo.jogador));
+    chips.appendChild(chip("PC", resumo.maquina || "-"));
+    chips.appendChild(chip("Usuario", resumo.usuario || "-"));
+    chips.appendChild(chip("Enviado", resumo.criado_em));
+    if (resumo.staff) chips.appendChild(chip("Liberado por", resumo.staff));
+
+    estado.achados = (rel.achados || []).map((a) => ({
+      severidade: a.severidade, titulo: a.titulo, detalhe: a.detalhe,
+      secao: a.categoria || a.secao || "", caminhos: a.caminhos || [],
+    }));
+    estado.processos = rel.processos || [];
+    estado.erros = rel.erros || [];
+
+    const classe = resumo.criticos > 0 ? "critico" : (resumo.alertas > 0 ? "alerta" : "ok");
+    const v = $("#veredito");
+    v.className = "veredito " + classe;
+    v.querySelector(".selo").textContent = classe === "critico" ? "!" : (classe === "alerta" ? "?" : "✓");
+    v.querySelector(".frase").textContent = resumo.veredito || rel.veredito || "Sem veredito";
+    v.querySelector("small").textContent = "Checagem de " + resumo.duracao + " na versao " + resumo.versao +
+      ". " + estado.achados.length + " achados, " + estado.processos.length + " processos listados." +
+      (resumo.parcial ? " ATENCAO: envio parcial, a checagem nao terminou." : "");
+
+    const c = $("#contadores").children;
+    c[0].querySelector("b").textContent = resumo.criticos;
+    c[1].querySelector("b").textContent = resumo.alertas;
+    c[2].querySelector("b").textContent = resumo.infos;
+    c[3].querySelector("b").textContent = resumo.erros;
+    $("#num-achados").textContent = estado.achados.length;
+    $("#num-processos").textContent = estado.processos.length;
+
+    const incompletas = rel.etapas_incompletas || [];
+    if (incompletas.length) {
+      $("#aviso-incompletas").classList.remove("oculto");
+      $("#aviso-incompletas").textContent = "Etapas que nao terminaram: " + incompletas.join(", ") +
+        ". O que elas mediriam ficou de fora deste relatorio.";
+    }
+
+    const cats = [...new Set(estado.achados.map((a) => a.secao).filter(Boolean))].sort();
+    const sel = $("#filtro-cat");
+    for (const cat of cats) sel.appendChild(new Option(cat, cat));
+
+    const grade = $("#grade-sistema");
+    for (const [k, val] of Object.entries(rel.sistema || {})) {
+      const item = criar("div", "item-sistema");
+      item.appendChild(criar("b", null, k));
+      item.appendChild(criar("span", null, val));
+      grade.appendChild(item);
+    }
+    desenhaAchados();
+    desenhaProcessos();
+  }
+
+  function desenhaAchados() {
+    const alvo = $("#lista-achados");
+    alvo.innerHTML = "";
+    if (estado.filtro === "ERRO") {
+      if (!estado.erros.length) { alvo.appendChild(criar("div", "vazio", "Nenhum erro nesta checagem.")); return; }
+      for (const e of estado.erros) {
+        const d = criar("div", "achado INFO");
+        const s = criar("summary");
+        s.appendChild(criar("span", "tag", "ERRO"));
+        s.appendChild(criar("span", "titulo", e));
+        d.appendChild(s);
+        alvo.appendChild(d);
+      }
+      return;
+    }
+    const busca = estado.busca.toLowerCase();
+    const lista = estado.achados.filter((a) => {
+      if (estado.filtro && a.severidade !== estado.filtro) return false;
+      if (estado.filtroCat && a.secao !== estado.filtroCat) return false;
+      if (!busca) return true;
+      return (a.titulo + " " + (a.detalhe || "") + " " + a.secao).toLowerCase().includes(busca);
+    });
+    const peso = { CRITICO: 0, ALERTA: 1, INFO: 2 };
+    lista.sort((a, b) => peso[a.severidade] - peso[b.severidade]);
+    if (!lista.length) { alvo.appendChild(criar("div", "vazio", "Nenhum achado para este filtro.")); return; }
+
+    let ultima = null;
+    for (const a of lista) {
+      if (a.severidade !== ultima) {
+        ultima = a.severidade;
+        alvo.appendChild(criar("div", "grupo-cat",
+          { CRITICO: "Criticos: indicio forte", ALERTA: "Alertas: precisam de olho humano", INFO: "Informativos: contexto" }[a.severidade]));
+      }
+      const d = criar("details", "achado " + a.severidade);
+      d.open = estado.expandido;
+      const s = criar("summary");
+      s.appendChild(criar("span", "tag", a.severidade));
+      const t = criar("span", "titulo", a.titulo);
+      if (a.secao) t.appendChild(criar("small", null, a.secao));
+      s.appendChild(t);
+      s.appendChild(criar("span", "seta", "▶"));
+      d.appendChild(s);
+      if (a.detalhe) d.appendChild(criar("pre", null, a.detalhe));
+      else d.appendChild(criar("div", "semdetalhe", "Sem detalhe adicional."));
+      if (a.caminhos && a.caminhos.length) {
+        const barra = criar("div", "caminhos");
+        for (const cam of a.caminhos) {
+          const b = criar("button", null, "Copiar " + cam.split(/[\\/]/).pop());
+          b.title = cam;
+          b.onclick = () => navigator.clipboard.writeText(cam).then(() => toast("Caminho copiado"));
+          barra.appendChild(b);
+        }
+        d.appendChild(barra);
+      }
+      alvo.appendChild(d);
+    }
+  }
+
+  function desenhaProcessos() {
+    const tb = $("#tabela-processos");
+    tb.innerHTML = "";
+    const busca = estado.buscaProc.toLowerCase();
+    const lista = estado.processos.filter((p) => !busca || (p.nome + " " + (p.caminho || "")).toLowerCase().includes(busca));
+    if (!lista.length) {
+      const tr = criar("tr"); const td = criar("td", "vazio", "Nenhum processo para este filtro.");
+      td.colSpan = 5; tr.appendChild(td); tb.appendChild(tr); return;
+    }
+    for (const p of lista) {
+      const tr = criar("tr");
+      tr.appendChild(criar("td", "mono", String(p.pid)));
+      tr.appendChild(criar("td", null, p.nome));
+      const sit = criar("td", null, p.situacao || "-");
+      const s = (p.situacao || "").toLowerCase();
+      if (s.includes("cheat")) sit.className = "marca-cheat";
+      else if (s.includes("suspeito")) sit.className = "marca-suspeito";
+      tr.appendChild(sit);
+      tr.appendChild(criar("td", null, p.pai || "-"));
+      tr.appendChild(criar("td", "mono", p.caminho || "-"));
+      tb.appendChild(tr);
+    }
+  }
+
+  $("#btn-entrar").addEventListener("click", entrar);
+  $("#senha").addEventListener("keydown", (e) => { if (e.key === "Enter") entrar(); });
+  $("#busca").addEventListener("input", (e) => { estado.busca = e.target.value; desenhaAchados(); });
+  $("#busca-proc").addEventListener("input", (e) => { estado.buscaProc = e.target.value; desenhaProcessos(); });
+  $("#filtro-cat").addEventListener("change", (e) => { estado.filtroCat = e.target.value; desenhaAchados(); });
+  $("#btn-expandir").addEventListener("click", () => {
+    estado.expandido = !estado.expandido;
+    $("#btn-expandir").textContent = estado.expandido ? "Recolher tudo" : "Expandir tudo";
+    desenhaAchados();
+  });
+  document.querySelectorAll(".contador").forEach((c) => {
+    c.addEventListener("click", () => {
+      const f = c.dataset.filtro;
+      estado.filtro = estado.filtro === f ? "" : f;
+      document.querySelectorAll(".contador").forEach((o) => o.classList.toggle("ativo", o.dataset.filtro === estado.filtro));
+      desenhaAchados();
+    });
+  });
+  document.querySelectorAll(".aba").forEach((a) => {
+    a.addEventListener("click", () => {
+      document.querySelectorAll(".aba").forEach((o) => o.classList.toggle("ativa", o === a));
+      for (const nome of ["achados", "processos", "sistema"]) {
+        $("#aba-" + nome).classList.toggle("oculto", nome !== a.dataset.aba);
+      }
+    });
+  });
+
+  carrega();
+</script>
+</body>
+</html>
