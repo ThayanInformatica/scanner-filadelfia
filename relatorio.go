@@ -54,6 +54,7 @@ type Relatorio struct {
 	CaminhoTxt  string             `json:"caminho_txt,omitempty"`
 	CaminhoJSON string             `json:"caminho_json,omitempty"`
 	Incompletas []string           `json:"etapas_incompletas,omitempty"`
+	Tempos      []TempoDeEtapa     `json:"tempos_por_etapa,omitempty"`
 	Criticos    int                `json:"criticos"`
 	Alertas     int                `json:"alertas"`
 	Infos       int                `json:"infos"`
@@ -62,11 +63,19 @@ type Relatorio struct {
 
 	cor        bool
 	secao      string
+	etapaAtual string
+	etapaDesde time.Time
 	texto      strings.Builder
 	inicio     time.Time
 	silencioso bool
 	mu         sync.Mutex
 	emitir     func(Evento)
+}
+
+type TempoDeEtapa struct {
+	Etapa    string `json:"etapa"`
+	Duracao  string `json:"duracao"`
+	segundos float64
 }
 
 type ProcessoRelatado struct {
@@ -160,7 +169,19 @@ func (r *Relatorio) Progresso(formato string, args ...any) {
 	r.emite(Evento{Tipo: "progresso", Secao: r.secao, Texto: msg})
 }
 
+func (r *Relatorio) fechaEtapa() {
+	if r.etapaAtual == "" {
+		return
+	}
+	d := time.Since(r.etapaDesde)
+	r.Tempos = append(r.Tempos, TempoDeEtapa{Etapa: r.etapaAtual, Duracao: d.Round(time.Second).String(), segundos: d.Seconds()})
+	r.etapaAtual = ""
+}
+
 func (r *Relatorio) Etapas(nome string, indice, total int) {
+	r.fechaEtapa()
+	r.etapaAtual = nome
+	r.etapaDesde = time.Now()
 	r.Etapa = nome
 	r.emite(Evento{Tipo: "etapa", Texto: nome, Etapa: indice, Total: total})
 }
@@ -250,9 +271,21 @@ func (r *Relatorio) contagem() (criticos, alertas, infos int) {
 }
 
 func (r *Relatorio) Resumo() {
+	r.fechaEtapa()
 	r.Secao("RESUMO")
 	criticos, alertas, infos := r.contagem()
 	r.Linha("Duracao da analise: %s", time.Since(r.inicio).Round(time.Second))
+	if len(r.Tempos) > 0 {
+		ordenados := append([]TempoDeEtapa(nil), r.Tempos...)
+		sort.SliceStable(ordenados, func(i, j int) bool { return ordenados[i].segundos > ordenados[j].segundos })
+		r.Linha("Tempo por etapa, da mais lenta para a mais rapida:")
+		for _, t := range ordenados {
+			if t.segundos < 1 {
+				continue
+			}
+			r.Linha("  %-9s %s", t.Duracao, t.Etapa)
+		}
+	}
 	r.Linha("Criticos: %d   Alertas: %d   Informativos: %d   Erros: %d", criticos, alertas, infos, len(r.Erros))
 
 	ordenados := append([]Achado(nil), r.Achados...)

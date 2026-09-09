@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-const versao = "2.10.2"
+const versao = "2.11.0"
 
 func main() {
 	exe, _ := os.Executable()

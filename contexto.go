@@ -23,6 +23,7 @@ type Contexto struct {
 	TaskmgrAbertoEm        time.Time
 	Execucoes              []EventoDeExecucao
 	AssinaturasDeProcessos map[string][2]string
+	Rastros                RastrosDeExecucao
 }
 
 func (c *Contexto) PedirParaPular() {

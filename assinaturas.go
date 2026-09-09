@@ -160,6 +160,10 @@ func indexaHashes(lista []string) map[string]string {
 	return idx
 }
 
+func (a *Assinaturas) TemHashes() bool {
+	return len(a.hashes) > 0
+}
+
 func (a *Assinaturas) HashConhecido(hex string) string {
 	return a.hashes[strings.ToLower(strings.TrimSpace(hex))]
 }

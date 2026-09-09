@@ -35,6 +35,7 @@ func etapasDoSistema() []Etapa {
 		{"FiveM", checarFiveM, false},
 		{"Integridade do jogo (FiveM e GTA V)", checarJogo, false},
 		{"Cache DNS e journal USN", checarRede, false},
+		{"Rastros de execucao (PC stopado?)", checarRastrosDeExecucao, false},
 		{"Historico dos navegadores", checarNavegadores, false},
 		{"Discord", checarDiscord, false},
 		{"Varredura de arquivos", checarArquivos, true},

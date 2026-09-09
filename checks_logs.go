@@ -79,6 +79,7 @@ func checarLogsDeEventos(c *Contexto) {
 	} else if len(limpezas) == 0 {
 		r.Ok("Nenhum registro de limpeza do log Security (evento 1102)")
 	}
+	c.Rastros.LimpezasDoSecurity = len(limpezas)
 	for _, e := range limpezas {
 		r.Add(Critico, "Log de SEGURANCA foi LIMPO em "+formataHora(e.Hora), "Evento 1102, usuario: "+e.Dados["SubjectUserName"]+". O evento 1102 sobrevive a limpeza justamente para marcar quem limpou")
 	}
@@ -100,6 +101,7 @@ func checarLogsDeEventos(c *Contexto) {
 			continue
 		}
 		limpezasVistas[chaveLimpeza] = true
+		c.Rastros.LimpezasDeOutrosLogs++
 		sev := Critico
 		nota := ""
 		if !e.Hora.IsZero() && time.Since(e.Hora) > 60*24*time.Hour {
@@ -137,6 +139,12 @@ func checarLogsDeEventos(c *Contexto) {
 		if !habilitado {
 			r.Add(Alerta, "Log '"+nome+"' esta DESABILITADO", "Log desligado nao registra nada")
 			continue
+		}
+		if registros == 0 && nome == "Security" {
+			c.Rastros.LogSecurityVazio = true
+		}
+		if registros == 0 && nome == "System" {
+			c.Rastros.LogSystemVazio = true
 		}
 		if registros == 0 && (nome == "Security" || nome == "System" || nome == "Application") {
 			r.Add(Critico, "Log '"+nome+"' esta VAZIO", "Um log principal nunca fica vazio em um Windows em uso")

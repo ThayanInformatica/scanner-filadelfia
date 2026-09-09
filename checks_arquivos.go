@@ -40,6 +40,8 @@ func checarPrefetch(c *Contexto) {
 	}
 	sort.Slice(arquivos, func(i, j int) bool { return arquivos[i].hora.After(arquivos[j].hora) })
 	r.Linha("%d arquivos .pf em %s", len(arquivos), pasta)
+	c.Rastros.PrefetchLido = true
+	c.Rastros.PrefetchQuantidade = len(arquivos)
 
 	if len(arquivos) == 0 && c.SysMainDesativado {
 		r.Add(Alerta, "Pasta Prefetch vazia porque o SysMain esta desativado", "Sem SysMain o Windows nao grava .pf. Comum em tutorial de otimizacao de SSD, mas tambem e o jeito de nao deixar rastro de programa executado")
@@ -104,6 +106,9 @@ func checarRecentesELixeira(c *Contexto) {
 			}
 		}
 		r.Linha("Recentes de %s: %d atalhos, ultimo em %s", p.Usuario, total, formataHora(maisNovo))
+		if total == 0 {
+			c.Rastros.RecentesVazio = true
+		}
 		if total == 0 && !c.Instalacao.IsZero() && time.Since(c.Instalacao) > 72*time.Hour {
 			r.Add(Alerta, "Pasta de recentes de "+p.Usuario+" esta vazia", "Limpeza manual ou por ferramenta (CCleaner e similares)")
 		}
@@ -264,7 +269,11 @@ func checarArquivos(c *Contexto) {
 				return nil
 			}
 			if ext == ".sys" {
-				if h := sha256DoArquivo(caminho, 32*1024*1024); h != "" {
+				h := ""
+				if c.A.TemHashes() {
+					h = sha256DoArquivo(caminho, 32*1024*1024)
+				}
+				if h != "" {
 					if rotulo := c.A.HashConhecido(h); rotulo != "" {
 						r.Add(Critico, "Driver com HASH conhecido no disco: "+d.Name(), caminho+"\nSHA256: "+h+"\nBate com: "+rotulo+"\nO hash nao muda quando o arquivo e renomeado")
 						return nil
@@ -292,10 +301,12 @@ func checarArquivos(c *Contexto) {
 			}
 			if quente {
 				if ext == ".exe" || ext == ".dll" {
-					if h := sha256DoArquivo(caminho, 64*1024*1024); h != "" {
-						if rotulo := c.A.HashConhecido(h); rotulo != "" {
-							r.Add(Critico, "Arquivo com HASH de cheat conhecido: "+d.Name(), caminho+"\nSHA256: "+h+"\nBate com: "+rotulo+"\nO hash nao muda quando o arquivo e renomeado")
-							return nil
+					if c.A.TemHashes() {
+						if h := sha256DoArquivo(caminho, 32*1024*1024); h != "" {
+							if rotulo := c.A.HashConhecido(h); rotulo != "" {
+								r.Add(Critico, "Arquivo com HASH de cheat conhecido: "+d.Name(), caminho+"\nSHA256: "+h+"\nBate com: "+rotulo+"\nO hash nao muda quando o arquivo e renomeado")
+								return nil
+							}
 						}
 					}
 					if pareceNomeAleatorio(d.Name()) {

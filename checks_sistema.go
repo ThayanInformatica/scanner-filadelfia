@@ -82,6 +82,7 @@ func checarSistema(c *Contexto) {
 
 	if v, ok := lerDword(registry.LOCAL_MACHINE, `SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management\PrefetchParameters`, "EnablePrefetcher"); ok {
 		if v == 0 {
+			c.Rastros.PrefetchDesligadoNoRegistro = true
 			r.Add(Critico, "Prefetch DESATIVADO no registro", "EnablePrefetcher=0. Impede o Windows de registrar programas executados")
 		} else {
 			r.Ok("Prefetch habilitado (EnablePrefetcher=%d)", v)

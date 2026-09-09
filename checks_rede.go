@@ -47,6 +47,9 @@ func checarRede(c *Contexto) {
 			}
 		}
 		r.Linha("%d nomes unicos no cache DNS", total)
+		if total < 5 && tempoLigado() > 3*time.Hour {
+			c.Rastros.DNSVazio = true
+		}
 		if total < 5 && tempoLigado() > 30*time.Minute {
 			r.Add(Alerta, "Cache DNS praticamente vazio com o PC ligado ha mais de 30 min", "ipconfig /flushdns ou servico Dnscache parado")
 		}
@@ -72,6 +75,7 @@ func checarRede(c *Contexto) {
 			continue
 		}
 		if !c.Instalacao.IsZero() && criado.Sub(c.Instalacao) > 24*time.Hour && time.Since(criado) < 14*24*time.Hour {
+			c.Rastros.JournalRecriado = append(c.Rastros.JournalRecriado, letra)
 			r.Add(Alerta, fmt.Sprintf("Journal USN de %s foi recriado em %s", letra, formataHora(criado)), fmt.Sprintf("Windows instalado em %s. Journal recriado depois da instalacao indica 'fsutil usn deletejournal' (ou chkdsk/erro de disco)", formataHora(c.Instalacao)))
 		}
 	}

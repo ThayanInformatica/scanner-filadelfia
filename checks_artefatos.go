@@ -84,6 +84,8 @@ func checarShimCache(c *Contexto) {
 		return
 	}
 	r.Linha("AppCompatCache (ShimCache): %d executaveis registrados pelo Windows", len(entradas))
+	c.Rastros.ShimCacheLido = true
+	c.Rastros.ShimCacheQuantidade = len(entradas)
 	if len(entradas) == 0 {
 		r.Add(Alerta, "ShimCache vazio", "O AppCompatCache guarda executaveis vistos pelo Windows e so e reescrito no desligamento. Vazio indica limpeza direta no registro")
 		return

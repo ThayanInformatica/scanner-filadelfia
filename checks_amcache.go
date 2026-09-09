@@ -109,6 +109,8 @@ func checarAmcache(c *Contexto) {
 		return
 	}
 	r.Linha("%d entradas no Amcache", len(entradas))
+	c.Rastros.AmcacheLido = true
+	c.Rastros.AmcacheQuantidade = len(entradas)
 	sinais := avaliarAmcache(entradas, c.A)
 	for _, s := range sinais {
 		r.Add(s.Severidade, s.Titulo, s.Detalhe)

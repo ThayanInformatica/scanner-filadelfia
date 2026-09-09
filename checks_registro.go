@@ -54,6 +54,9 @@ func checarRegistro(c *Contexto) {
 	}
 	r.Linha("Entradas encontradas: %s", strings.Join(resumoFontes, "  "))
 
+	c.Rastros.BAMLido = true
+	c.Rastros.BAMQuantidade = porFonte["BAM"]
+	c.Rastros.UserAssistQuantidade = porFonte["UserAssist"]
 	if porFonte["BAM"] == 0 {
 		r.Add(Critico, "BAM VAZIO", "O BAM sempre tem dezenas de entradas em um Windows em uso. Vazio = limpo ou servico desligado")
 	} else if porFonte["BAM"] < 15 && !c.Instalacao.IsZero() && time.Since(c.Instalacao) > 7*24*time.Hour {

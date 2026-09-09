@@ -2,11 +2,15 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -78,6 +82,64 @@ func varrerConteudoCancelavel(a *Assinaturas, raizes []string, limite time.Durat
 	vistos := map[string]bool{}
 	ultimoAviso := time.Now()
 
+	type candidato struct {
+		caminho string
+		ext     string
+		info    fs.FileInfo
+	}
+	fila := make(chan candidato, 4096)
+	var mu sync.Mutex
+	var arquivosLidos int64
+	var bytesLidos int64
+	var wg sync.WaitGroup
+	trabalhadores := runtime.NumCPU()
+	if trabalhadores > 8 {
+		trabalhadores = 8
+	}
+	if trabalhadores < 2 {
+		trabalhadores = 2
+	}
+	for i := 0; i < trabalhadores; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			buf := make([]byte, 0, 4*1024*1024)
+			for c := range fila {
+				dados, ok := lerArquivoInteiro(c.caminho, c.info.Size(), &buf)
+				if !ok {
+					continue
+				}
+				atomic.AddInt64(&arquivosLidos, 1)
+				atomic.AddInt64(&bytesLidos, int64(len(dados)))
+				if extensoesIgnoradasNoConteudo[c.ext] && !comecaComMZ(dados) {
+					continue
+				}
+				termos := map[string]bool{}
+				contexto := ""
+				buscador.Procurar(dados, func(o Ocorrencia) bool {
+					if !termos[o.Termo] {
+						termos[o.Termo] = true
+						if contexto == "" {
+							contexto = trechoEmVolta(dados, o.Inicio, o.Fim, o.UTF16)
+						}
+					}
+					return len(termos) < 6
+				})
+				if len(termos) == 0 {
+					continue
+				}
+				var lista []string
+				for t := range termos {
+					lista = append(lista, t)
+				}
+				sort.Strings(lista)
+				mu.Lock()
+				res.Achados = append(res.Achados, achadoConteudo{Caminho: c.caminho, Termos: lista, Contexto: contexto, Extensao: c.ext, Modificado: c.info.ModTime(), Tamanho: c.info.Size()})
+				mu.Unlock()
+			}
+		}()
+	}
+
 	for _, raiz := range raizes {
 		if raiz == "" || !existe(raiz) {
 			continue
@@ -86,13 +148,13 @@ func varrerConteudoCancelavel(a *Assinaturas, raizes []string, limite time.Durat
 			if err != nil {
 				return nil
 			}
-			if estourouOTempo(inicio, limite) || estourouOTamanho(res.Bytes, limiteBytes) || (cancelar != nil && cancelar()) {
+			if estourouOTempo(inicio, limite) || estourouOTamanho(atomic.LoadInt64(&bytesLidos), limiteBytes) || (cancelar != nil && cancelar()) {
 				res.Interrompido = true
 				return filepath.SkipAll
 			}
 			if progresso != nil && time.Since(ultimoAviso) > 1500*time.Millisecond {
 				ultimoAviso = time.Now()
-				progresso(res.Arquivos, res.Bytes, filepath.Dir(caminho))
+				progresso(int(atomic.LoadInt64(&arquivosLidos)), atomic.LoadInt64(&bytesLidos), filepath.Dir(caminho))
 			}
 			if d.IsDir() {
 				if caminho != raiz && ignorarNoConteudo(caminho+string(os.PathSeparator), a) {
@@ -106,43 +168,58 @@ func varrerConteudoCancelavel(a *Assinaturas, raizes []string, limite time.Durat
 			}
 			vistos[lower] = true
 			ext := strings.ToLower(filepath.Ext(caminho))
-			if extensoesIgnoradasNoConteudo[ext] {
+			if extensoesIgnoradasNoConteudo[ext] && !extensaoQuePodeEsconderPrograma[ext] {
 				return nil
 			}
 			info, err := d.Info()
 			if err != nil || info.Size() == 0 || info.Size() > 30*1024*1024 {
 				return nil
 			}
-			dados, err := os.ReadFile(caminho)
-			if err != nil {
-				return nil
-			}
-			res.Arquivos++
-			res.Bytes += int64(len(dados))
-
-			termos := map[string]bool{}
-			contexto := ""
-			buscador.Procurar(dados, func(o Ocorrencia) bool {
-				if !termos[o.Termo] {
-					termos[o.Termo] = true
-					if contexto == "" {
-						contexto = trechoEmVolta(dados, o.Inicio, o.Fim, o.UTF16)
-					}
-				}
-				return len(termos) < 6
-			})
-			if len(termos) > 0 {
-				var lista []string
-				for t := range termos {
-					lista = append(lista, t)
-				}
-				sort.Strings(lista)
-				res.Achados = append(res.Achados, achadoConteudo{Caminho: caminho, Termos: lista, Contexto: contexto, Extensao: ext, Modificado: info.ModTime(), Tamanho: info.Size()})
-			}
+			fila <- candidato{caminho: caminho, ext: ext, info: info}
 			return nil
 		})
 	}
+	close(fila)
+	wg.Wait()
+	res.Arquivos = int(arquivosLidos)
+	res.Bytes = bytesLidos
+	sort.Slice(res.Achados, func(i, j int) bool { return res.Achados[i].Caminho < res.Achados[j].Caminho })
 	return res
+}
+
+var extensaoQuePodeEsconderPrograma = map[string]bool{
+	".rpf": true, ".ytd": true, ".ydr": true, ".yft": true, ".ymap": true, ".ybn": true, ".ydd": true, ".awc": true,
+	".pak": true, ".db": true, ".ldb": true, ".pdb": true, ".lib": true, ".obj": true, ".o": true, ".map": true, ".bik": true,
+}
+
+func comecaComMZ(dados []byte) bool {
+	return len(dados) > 2 && dados[0] == 'M' && dados[1] == 'Z'
+}
+
+func lerArquivoInteiro(caminho string, tamanho int64, buf *[]byte) ([]byte, bool) {
+	f, err := os.Open(caminho)
+	if err != nil {
+		return nil, false
+	}
+	defer f.Close()
+	if real, err := f.Stat(); err == nil {
+		if real.IsDir() || real.Size() > 30*1024*1024 {
+			return nil, false
+		}
+		tamanho = real.Size()
+	}
+	if tamanho <= 0 {
+		return nil, false
+	}
+	if int64(cap(*buf)) < tamanho {
+		*buf = make([]byte, 0, tamanho+tamanho/4)
+	}
+	dados := (*buf)[:tamanho]
+	n, err := io.ReadFull(f, dados)
+	if err != nil && err != io.ErrUnexpectedEOF {
+		return nil, false
+	}
+	return dados[:n], true
 }
 
 func raizesParaConteudo(perfis []Perfil, extras []string) []string {
