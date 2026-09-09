@@ -36,12 +36,12 @@ type respostaDeSessao struct {
 	Erro    string `json:"erro"`
 }
 
-func (a *Autorizacao) Exigida() bool {
+func (a *Autorizacao) Configurada() bool {
 	return a != nil && strings.TrimSpace(a.API) != ""
 }
 
 func (a *Autorizacao) Liberado() bool {
-	if !a.Exigida() {
+	if !a.Configurada() {
 		return true
 	}
 	a.mu.Lock()
@@ -66,7 +66,7 @@ func (a *Autorizacao) Descricao() string {
 }
 
 func (a *Autorizacao) Entrar(codigo string) error {
-	if !a.Exigida() {
+	if !a.Configurada() {
 		return nil
 	}
 	codigo = strings.ToUpper(strings.TrimSpace(codigo))
@@ -107,7 +107,7 @@ func (a *Autorizacao) Entrar(codigo string) error {
 }
 
 func (a *Autorizacao) Encerrar() {
-	if !a.Exigida() {
+	if !a.Configurada() {
 		return
 	}
 	a.mu.Lock()
@@ -137,7 +137,7 @@ type respostaDeRelatorio struct {
 }
 
 func (a *Autorizacao) EnviarRelatorio(r *Relatorio, duracao string, parcial bool) (string, error) {
-	if !a.Exigida() {
+	if !a.Configurada() {
 		return "", nil
 	}
 	a.mu.Lock()
@@ -194,7 +194,7 @@ func (a *Autorizacao) EnviarRelatorio(r *Relatorio, duracao string, parcial bool
 }
 
 func (a *Autorizacao) BaixarAssinaturas() ([]byte, error) {
-	if !a.Exigida() {
+	if !a.Configurada() {
 		return nil, nil
 	}
 	a.mu.Lock()

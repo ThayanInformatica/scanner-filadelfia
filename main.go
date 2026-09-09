@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-const versao = "2.9.0"
+const versao = "2.9.1"
 
 func main() {
 	exe, _ := os.Executable()
@@ -29,8 +29,8 @@ func main() {
 	semElevar := flag.Bool("sem-elevar", false, "nao tenta reabrir como administrador")
 	verboso := flag.Bool("verboso", false, "mostra detalhes extras")
 	demo := flag.Bool("demo", false, "mostra os botoes de demonstracao na tela (uso interno da equipe)")
-	api := flag.String("api", apiPadrao, "endereco do servidor de autorizacao da equipe; vazio libera o uso sem codigo")
-	codigo := flag.String("codigo", "", "codigo de autorizacao para o modo console")
+	api := flag.String("api", apiPadrao, "endereco do servidor da equipe, usado junto com -codigo")
+	codigo := flag.String("codigo", "", "codigo da equipe: baixa a lista atualizada e entrega o relatorio pelo painel")
 	exportar := flag.Bool("exportar-assinaturas", false, "grava o assinaturas.json padrao ao lado do exe e sai")
 	flag.Parse()
 
@@ -71,16 +71,15 @@ func main() {
 	auth := &Autorizacao{API: *api}
 
 	if *console {
-		if auth.Exigida() {
+		if auth.Configurada() && *codigo != "" {
 			if err := auth.Entrar(*codigo); err != nil {
-				fmt.Println("Sem autorizacao para rodar:", err)
-				fmt.Println("Peca um codigo para a equipe e rode com -codigo FLD-XXXX-XXXX")
-				pausa(*semPausa)
-				os.Exit(1)
+				fmt.Println("Codigo recusado:", err)
+				fmt.Println("Seguindo sem entregar o relatorio para a equipe.")
+			} else {
+				defer auth.Encerrar()
 			}
-			defer auth.Encerrar()
 		}
-		if bruto, err := auth.BaixarAssinaturas(); err == nil && len(bruto) > 0 {
+		if bruto, err := auth.BaixarAssinaturas(); err == nil && len(bruto) > 0 && auth.Liberado() {
 			if novas, origem, err := AssinaturasDeBytes(bruto, "servidor da equipe"); err == nil {
 				a = novas
 				resumoAssinaturas = fmt.Sprintf("Assinaturas: %s (%d cheats, %d ferramentas, %d limpadores, %d dominios, %d drivers)", origem, len(a.Cheats), len(a.Ferramentas), len(a.Limpeza), len(a.Dominios), len(a.Drivers))
@@ -140,7 +139,7 @@ func rodarConsole(a *Assinaturas, resumoAssinaturas, saida string, rapido, verbo
 	}
 
 	r.Resumo()
-	if auth.Exigida() {
+	if auth.Liberado() {
 		if protocolo, err := auth.EnviarRelatorio(r, time.Since(r.inicio).Round(time.Second).String(), false); err != nil {
 			fmt.Println(r.pinta(corAmarelo, "Nao consegui enviar o relatorio para a equipe: "+err.Error()))
 		} else {

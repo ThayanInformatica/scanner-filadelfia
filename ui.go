@@ -85,7 +85,7 @@ func (s *Servidor) estado() map[string]any {
 		"total_dominios": len(s.assinaturas.Dominios),
 		"versao":         versao,
 		"demo":           s.demo,
-		"precisa_codigo": s.auth.Exigida(),
+		"aceita_codigo":  s.auth.Configurada(),
 		"autorizado":     s.auth.Liberado(),
 		"autorizacao":    s.auth.Descricao(),
 	}
@@ -178,7 +178,7 @@ func (s *Servidor) executar(modo string, rapido bool) {
 	s.mu.Unlock()
 
 	protocolo, envio := "", ""
-	if s.auth.Exigida() {
+	if s.auth.Liberado() {
 		r.Progresso("Enviando o relatorio para a equipe...")
 		p, err := s.auth.EnviarRelatorio(r, time.Since(r.inicio).Round(time.Second).String(), false)
 		if err != nil {
@@ -264,10 +264,6 @@ func (s *Servidor) rotas() *http.ServeMux {
 		rapido := req.URL.Query().Get("rapido") == "1"
 		if modo == "" {
 			modo = "completo"
-		}
-		if !s.auth.Liberado() {
-			escreveJSON(w, map[string]any{"ok": false, "erro": "digite o codigo de autorizacao da equipe antes de comecar"})
-			return
 		}
 		if ehSimulacao(modo) && !s.demo {
 			escreveJSON(w, map[string]any{"ok": false, "erro": "modo de demonstracao desligado"})

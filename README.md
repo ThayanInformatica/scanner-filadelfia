@@ -10,12 +10,18 @@ programa le, o que sai da sua maquina e o que ele nao faz.
 
 ## Como funciona
 
-O jogador abre o executavel, digita o codigo que a equipe passou, e roda a checagem. No fim,
-o relatorio inteiro sobe para o servidor da cidade e a equipe abre pelo painel, sem precisar
-receber arquivo pela mao de quem esta sendo checado.
+O jogador abre o executavel e roda a checagem. No fim, o relatorio fica salvo em `.txt` e
+`.json` na pasta do exe, e aparece na tela.
 
-O codigo de autorizacao vale uma vez, em um unico computador, e queima quando o relatorio
-chega.
+Nao precisa de codigo, nem de internet, nem de servidor. O scanner e util sozinho.
+
+Se a sua cidade rodar o servico opcional que esta em [`servidor/`](servidor/), a equipe pode
+gerar um codigo e passar para o jogador. Com o codigo, duas coisas mudam: o scanner usa a
+lista de cheat atualizada da cidade em vez da lista local, e entrega o relatorio inteiro no
+painel da equipe, sem depender de receber arquivo pela mao de quem esta sendo checado. Esse
+codigo vale uma vez, em um unico computador, e queima quando o relatorio chega.
+
+Sem codigo, tudo continua funcionando, so fica local.
 
 ## O que ele procura
 
@@ -35,8 +41,8 @@ conversa com o jogador, nao para banir sozinha.
 Precisa de Go 1.27 ou mais novo. Nao usa cgo.
 
 ```
-./build.sh                                  # exe solto, sem exigir autorizacao
-./build.sh https://scanner.suacidade.com    # exe que so roda com codigo da equipe
+./build.sh                                  # exe comum
+./build.sh https://scanner.suacidade.com    # exe que ja vem sabendo o endereco da sua cidade
 ```
 
 Sai em `dist/scanner.exe`. O endereco do servidor fica gravado no binario.

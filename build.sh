@@ -11,8 +11,8 @@ fi
 API="${1:-${SCANNER_API:-}}"
 GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -ldflags "-X main.apiPadrao=$API" -o dist/scanner.exe .
 if [ -n "$API" ]; then
-  echo "exe exige autorizacao em $API"
+  echo "exe fala com $API quando o jogador informar um codigo"
 else
-  echo "AVISO: exe compilado SEM servidor de autorizacao, roda solto em qualquer PC"
+  echo "exe sem servidor: roda 100% local"
 fi
 ls -la dist
