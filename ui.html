@@ -274,6 +274,9 @@
 
   .rodape { margin-top: 40px; padding-top: 18px; border-top: 1px solid var(--linha); font-family: var(--mono); font-size: 10.5px; letter-spacing: .06em; color: var(--mudo); text-align: center; text-transform: uppercase; }
 
+  .painel.parcial .rodape-acoes, .painel.parcial .arquivos, .painel.parcial .aba[data-aba="log"] { display: none; }
+  .painel.parcial .veredito { border-style: dashed; }
+  .painel.parcial .veredito .selo { letter-spacing: .1em; }
   .toast { position: fixed; bottom: 26px; left: 50%; transform: translateX(-50%); background: var(--osso); color: var(--tinta0); padding: 11px 22px; font-family: var(--display); font-size: 13px; letter-spacing: .1em; text-transform: uppercase; font-weight: 600; opacity: 0; transition: opacity .2s; pointer-events: none; z-index: 10; }
   .toast.ver { opacity: 1; }
 
@@ -633,6 +636,7 @@
         estado.linhas.push("  [" + ev.severidade + "] " + ev.titulo);
         if (ev.detalhe) estado.linhas.push("        " + ev.detalhe.replace(/\n/g, "\n        "));
         empurraTicker("[" + ev.severidade + "] " + ev.titulo, ev.severidade);
+        agendaParcial();
         break;
       case "fim":
         estado.fim = JSON.parse(ev.texto);
@@ -647,8 +651,40 @@
     while (t.children.length > 5) t.removeChild(t.lastChild);
   }
 
+  let temporizadorParcial = null;
+  function agendaParcial() {
+    if (estado.replay || !estado.rodando) return;
+    if (temporizadorParcial) return;
+    temporizadorParcial = setTimeout(() => { temporizadorParcial = null; desenhaParcial(); }, 400);
+  }
+
+  function desenhaParcial() {
+    if (!estado.rodando) return;
+    const painel = $("#painel-resultado");
+    painel.classList.remove("oculto");
+    painel.classList.add("parcial");
+    const v = $("#veredito");
+    const c = estado.cont;
+    const classe = c.CRITICO > 0 ? "critico" : (c.ALERTA > 0 ? "alerta" : "ok");
+    v.className = "veredito " + classe;
+    v.querySelector(".selo").textContent = "...";
+    v.querySelector(".frase").textContent = "Checagem em andamento: resultado parcial";
+    v.querySelector("small").textContent = "Os achados vao aparecendo aqui conforme saem. O veredito final so vale quando a ultima etapa terminar.";
+    const cont = $("#contadores").children;
+    cont[0].querySelector("b").textContent = c.CRITICO;
+    cont[1].querySelector("b").textContent = c.ALERTA;
+    cont[2].querySelector("b").textContent = c.INFO;
+    cont[3].querySelector("b").textContent = 0;
+    $("#num-achados").textContent = estado.achados.length;
+    $("#num-processos").textContent = estado.processos.length;
+    montaCategorias();
+    desenhaAchados();
+  }
+
   function finaliza() {
     estado.rodando = false;
+    if (temporizadorParcial) { clearTimeout(temporizadorParcial); temporizadorParcial = null; }
+    $("#painel-resultado").classList.remove("parcial");
     const f = estado.fim;
     $("#barra").style.width = "100%";
     $("#painel-progresso").classList.add("oculto");
@@ -865,6 +901,8 @@
     document.querySelectorAll(".contador").forEach((c) => c.classList.remove("ativo"));
     document.querySelectorAll(".acao").forEach((b) => { b.disabled = true; });
     $("#painel-resultado").classList.add("oculto");
+    $("#painel-resultado").classList.remove("parcial");
+    $("#lista-achados").innerHTML = "";
     $("#painel-progresso").classList.remove("oculto");
     $("#barra").style.width = "0%";
     $("#etapa-atual").textContent = "Preparando...";
@@ -980,6 +1018,7 @@
         estado.rodando = true;
         document.querySelectorAll(".acao").forEach((b) => { b.disabled = true; });
         $("#painel-progresso").classList.remove("oculto");
+        if (estado.achados.length) desenhaParcial();
       }
     });
   }
