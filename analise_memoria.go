@@ -209,3 +209,176 @@ func avaliarMemoriaDeProcesso(nome, caminho, statusAssinatura, assinante string,
 	detalhe += "\nO programa nao tem assinatura digital valida e carrega nome de cheat na memoria. E o padrao de cheat externo (overlay, aimbot por processo separado) e de loader renomeado"
 	return []Sinal{{Critico, fmt.Sprintf("String de cheat ('%s') NA MEMORIA de %s", termos[0], nome), detalhe, "cheat"}}
 }
+
+type AchadoDeDados struct {
+	Endereco uint64
+	Termos   []string
+	Contexto string
+}
+
+func avaliarMemoriaDeDadosDoJogo(achados []AchadoDeDados, bytesLidos int64, processo string) []Sinal {
+	if len(achados) == 0 {
+		return nil
+	}
+	porTermo := map[string]AchadoDeDados{}
+	var ordem []string
+	for _, a := range achados {
+		for _, t := range a.Termos {
+			if _, existe := porTermo[t]; !existe {
+				ordem = append(ordem, t)
+				porTermo[t] = a
+			}
+		}
+	}
+	sort.Strings(ordem)
+	var sinais []Sinal
+	for _, termo := range ordem {
+		a := porTermo[termo]
+		detalhe := fmt.Sprintf("Endereco 0x%X na memoria de dados de %s", a.Endereco, processo)
+		if a.Contexto != "" {
+			detalhe += "\n..." + a.Contexto + "..."
+		}
+		detalhe += "\nExecutor de Lua funciona achando o lua_State do jogo e mandando o script para dentro do processo. O texto do script fica na memoria de dados, que e onde isso foi encontrado. Vale mesmo com o programa do cheat ja fechado, porque o texto continua no processo do jogo"
+		sinais = append(sinais, Sinal{Critico, fmt.Sprintf("String de cheat '%s' na MEMORIA DE DADOS de %s", termo, processo), detalhe, "cheat"})
+	}
+	return ordenaSinais(sinais)
+}
+
+type ThreadAnalisada struct {
+	TID          uint32
+	Inicial      uint64
+	Modulo       string
+	TipoDaRegiao string
+	Protecao     string
+	TemPE        bool
+}
+
+func avaliarThreadsDoJogo(threads []ThreadAnalisada, processo string) []Sinal {
+	var privadas []string
+	var mapeadas []string
+	for _, t := range threads {
+		if t.Modulo != "" || t.Inicial == 0 {
+			continue
+		}
+		linha := fmt.Sprintf("thread %d comeca em 0x%X  (%s, %s)", t.TID, t.Inicial, t.TipoDaRegiao, t.Protecao)
+		if t.TemPE {
+			linha += "  com cabecalho de programa (PE) na regiao"
+		}
+		switch t.TipoDaRegiao {
+		case "privada (sem arquivo)":
+			privadas = append(privadas, linha)
+		case "livre", "":
+		default:
+			mapeadas = append(mapeadas, linha)
+		}
+	}
+	var sinais []Sinal
+	if len(privadas) > 0 {
+		sort.Strings(privadas)
+		sinais = append(sinais, Sinal{Critico, fmt.Sprintf("%d thread(s) de %s executando de memoria privada, fora de qualquer dll", len(privadas), processo), strings.Join(limitaLinhas(privadas, 40), "\n") + "\nToda thread normal comeca dentro de uma dll ou do exe. Thread que comeca em memoria privada e codigo carregado na marra (manual map) rodando dentro do jogo. Nao aparece na lista de modulos e sobrevive ao jogador fechar o programa do cheat", "cheat"})
+	}
+	if len(mapeadas) > 0 {
+		sort.Strings(mapeadas)
+		sinais = append(sinais, Sinal{Alerta, fmt.Sprintf("%d thread(s) de %s comecam fora dos modulos carregados", len(mapeadas), processo), strings.Join(limitaLinhas(mapeadas, 40), "\n") + "\nA regiao nao e privada, entao pode ser codigo gerado na hora por V8 ou Mono, que o FiveM usa. Vale olhar junto com o resto", "suspeito"})
+	}
+	return sinais
+}
+
+type HookDetectado struct {
+	Modulo          string
+	Deslocamento    uint64
+	Endereco        uint64
+	Destino         uint64
+	ModuloDoDestino string
+	TipoDoDestino   string
+	BytesEmMemoria  string
+	BytesNoDisco    string
+}
+
+var modulosQueRecebemHookLegitimo = []string{"d3d11.dll", "dxgi.dll", "d3d12.dll", "d3d9.dll", "opengl32.dll", "gdi32.dll", "gdi32full.dll"}
+
+func hookLegitimoConhecido(modulo string) bool {
+	lower := strings.ToLower(modulo)
+	for _, m := range modulosQueRecebemHookLegitimo {
+		if lower == m {
+			return true
+		}
+	}
+	return false
+}
+
+func avaliarHooks(hooks []HookDetectado, processo string) []Sinal {
+	if len(hooks) == 0 {
+		return nil
+	}
+	var paraPrivada []string
+	porModulo := map[string][]string{}
+	var ordem []string
+	for _, h := range hooks {
+		linha := fmt.Sprintf("%s+0x%X (0x%X) desvia para 0x%X", h.Modulo, h.Deslocamento, h.Endereco, h.Destino)
+		if h.ModuloDoDestino != "" {
+			linha += " dentro de " + h.ModuloDoDestino
+		} else {
+			linha += " em memoria " + h.TipoDoDestino
+		}
+		linha += fmt.Sprintf("  [memoria: %s | disco: %s]", h.BytesEmMemoria, h.BytesNoDisco)
+		if h.ModuloDoDestino == "" && h.TipoDoDestino == "privada (sem arquivo)" {
+			paraPrivada = append(paraPrivada, linha)
+			continue
+		}
+		if _, existe := porModulo[h.Modulo]; !existe {
+			ordem = append(ordem, h.Modulo)
+		}
+		porModulo[h.Modulo] = append(porModulo[h.Modulo], linha)
+	}
+
+	var sinais []Sinal
+	if len(paraPrivada) > 0 {
+		sort.Strings(paraPrivada)
+		sinais = append(sinais, Sinal{Critico, fmt.Sprintf("%d funcao(oes) do Windows dentro de %s desviada(s) para codigo sem arquivo", len(paraPrivada), processo), strings.Join(limitaLinhas(paraPrivada, 40), "\n") + "\nO codigo da dll na memoria esta diferente do arquivo no disco, e o desvio cai em memoria privada, que nao pertence a nenhum programa instalado. Antivirus e overlay tambem desviam funcoes, mas o desvio deles cai dentro da propria dll deles. Cair em memoria sem arquivo e codigo injetado", "cheat"})
+	}
+	sort.Strings(ordem)
+	for _, modulo := range ordem {
+		linhas := porModulo[modulo]
+		sev := Alerta
+		nota := "\nO codigo dessa dll na memoria esta diferente do arquivo no disco. O desvio cai dentro de outro programa instalado, o que e normal em antivirus, overlay do Discord, Steam, RivaTuner e ReShade. Confira de quem e a dll de destino"
+		if hookLegitimoConhecido(modulo) {
+			sev = Info
+			nota = "\nDesvio em dll grafica e o mecanismo normal de ReShade, ENB, overlay do Discord e RivaTuner. So vale como indicio se o destino nao tiver dono conhecido"
+		}
+		sinais = append(sinais, Sinal{sev, fmt.Sprintf("%d desvio(s) de funcao em %s dentro de %s", len(linhas), modulo, processo), strings.Join(limitaLinhas(linhas, 40), "\n") + nota, "suspeito"})
+	}
+	return ordenaSinais(sinais)
+}
+
+func destinoDoDesvio(codigo []byte, endereco uint64) (uint64, bool) {
+	if len(codigo) >= 5 && codigo[0] == 0xE9 {
+		rel := int32(uint32(codigo[1]) | uint32(codigo[2])<<8 | uint32(codigo[3])<<16 | uint32(codigo[4])<<24)
+		return uint64(int64(endereco) + 5 + int64(rel)), true
+	}
+	if len(codigo) >= 12 && codigo[0] == 0x48 && codigo[1] == 0xB8 && codigo[10] == 0xFF && codigo[11] == 0xE0 {
+		var destino uint64
+		for i := 0; i < 8; i++ {
+			destino |= uint64(codigo[2+i]) << (8 * i)
+		}
+		return destino, true
+	}
+	if len(codigo) >= 6 && codigo[0] == 0x68 && codigo[5] == 0xC3 {
+		return uint64(uint32(codigo[1]) | uint32(codigo[2])<<8 | uint32(codigo[3])<<16 | uint32(codigo[4])<<24), true
+	}
+	if len(codigo) >= 2 && codigo[0] == 0xFF && codigo[1] == 0x25 {
+		return 0, true
+	}
+	return 0, false
+}
+
+func emHexa(dados []byte, n int) string {
+	if len(dados) > n {
+		dados = dados[:n]
+	}
+	var partes []string
+	for _, b := range dados {
+		partes = append(partes, fmt.Sprintf("%02X", b))
+	}
+	return strings.Join(partes, " ")
+}

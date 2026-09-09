@@ -34,6 +34,9 @@ Sem codigo, tudo continua funcionando, so fica local.
 - Rastro em navegador, Discord e pacote compactado.
 - Programa que ja rodou e foi apagado, pelo Amcache, com hash para pegar loader renomeado.
 - Cheat externo: nome de cheat na memoria de qualquer processo sem assinatura confiavel.
+- Executor de Lua: script de cheat na memoria de dados do jogo, thread comecando fora de dll
+  registrada, e funcao do Windows desviada para codigo sem arquivo.
+- PC preparado para telagem: Prefetch, BAM, Amcache, ShimCache, logs e journal cruzados.
 
 Um resultado critico e indicio forte, nao prova. A ferramenta foi feita para embasar
 conversa com o jogador, nao para banir sozinha.

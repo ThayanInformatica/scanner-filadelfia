@@ -59,8 +59,14 @@ func checarMemoriaDoJogo(c *Contexto) {
 			r.Add(s.Severidade, s.Titulo, s.Detalhe)
 		}
 		if len(sinais) == 0 {
-			r.Ok("Nenhum codigo injetado nem string de cheat na memoria de %s", p.Nome)
+			r.Ok("Nenhum codigo injetado nem string de cheat na memoria executavel de %s", p.Nome)
 		}
+		if c.DevePular() {
+			break
+		}
+		checarMemoriaDeDados(c, p, buscador)
+		checarThreadsDoJogo(c, p)
+		checarHooksNoJogo(c, p)
 	}
 
 	checarMemoriaDosOutrosProcessos(c, processos, buscador)
@@ -176,5 +182,176 @@ func checarMemoriaDosOutrosProcessos(c *Contexto, processos []Processo, buscador
 	r.Linha("%d MB de memoria lidos em %d processos em %s", totalMB, len(alvos), time.Since(inicio).Round(time.Second))
 	if achou == 0 && !c.Pulou() {
 		r.Ok("Nenhum processo fora do Windows carrega nome de cheat na memoria")
+	}
+}
+
+func checarMemoriaDeDados(c *Contexto, p Processo, buscador *Buscador) {
+	r := c.R
+	r.Progresso("Lendo a memoria de dados de %s (PID %d) atras de script de cheat", p.Nome, p.PID)
+	var achados []AchadoDeDados
+	vistos := map[string]bool{}
+	inicio := time.Now()
+	lidos, err := varrerMemoriaDeDados(p.PID, 4*1024*1024*1024, func(regiao RegiaoDeMemoria, dados []byte) {
+		buscador.Procurar(dados, func(o Ocorrencia) bool {
+			if vistos[o.Termo] {
+				return true
+			}
+			vistos[o.Termo] = true
+			achados = append(achados, AchadoDeDados{Endereco: regiao.Base + uint64(o.Inicio), Termos: []string{o.Termo}, Contexto: trechoEmVolta(dados, o.Inicio, o.Fim, o.UTF16)})
+			return len(vistos) < 12
+		})
+	})
+	if err != nil {
+		r.Erro("ler memoria de dados de %s: %v", p.Nome, err)
+		return
+	}
+	r.Linha("%s (PID %d): %d MB de memoria de dados lidos em %s", p.Nome, p.PID, lidos/1024/1024, time.Since(inicio).Round(time.Second))
+	sinais := avaliarMemoriaDeDadosDoJogo(achados, lidos, p.Nome)
+	for _, s := range sinais {
+		r.Add(s.Severidade, s.Titulo, s.Detalhe)
+	}
+	if len(sinais) == 0 {
+		r.Ok("Nenhum script ou nome de cheat na memoria de dados de %s", p.Nome)
+	}
+}
+
+func checarThreadsDoJogo(c *Contexto, p Processo) {
+	r := c.R
+	threads, err := listarThreads(p.PID)
+	if err != nil {
+		r.Erro("listar threads de %s: %v", p.Nome, err)
+		return
+	}
+	modulos, err := intervalosDeModulos(p.PID)
+	if err != nil {
+		r.Erro("modulos de %s: %v", p.Nome, err)
+		return
+	}
+	dono := func(endereco uint64) string {
+		for _, m := range modulos {
+			if endereco >= m.Base && endereco < m.Base+m.Tamanho {
+				return m.Nome
+			}
+		}
+		return ""
+	}
+	var analisadas []ThreadAnalisada
+	for _, t := range threads {
+		a := ThreadAnalisada{TID: t.TID, Inicial: t.Inicial, Modulo: dono(t.Inicial)}
+		if a.Modulo == "" && t.Inicial != 0 {
+			a.TipoDaRegiao, a.Protecao, _ = descreverRegiao(p.PID, t.Inicial)
+			if dados, err := lerMemoria(p.PID, t.Inicial&^0xFFF, 4096); err == nil {
+				a.TemPE = temCabecalhoPE(dados)
+			}
+		}
+		analisadas = append(analisadas, a)
+	}
+	r.Linha("%s (PID %d): %d threads, %d modulos carregados", p.Nome, p.PID, len(analisadas), len(modulos))
+	sinais := avaliarThreadsDoJogo(analisadas, p.Nome)
+	for _, s := range sinais {
+		r.Add(s.Severidade, s.Titulo, s.Detalhe)
+	}
+	if len(sinais) == 0 {
+		r.Ok("Todas as threads de %s comecam dentro de dll registrada", p.Nome)
+	}
+}
+
+var modulosParaConferirNoDisco = []string{
+	"ntdll.dll", "kernel32.dll", "kernelbase.dll", "user32.dll", "ws2_32.dll", "wininet.dll",
+	"d3d11.dll", "dxgi.dll", "gdi32.dll", "advapi32.dll",
+}
+
+func checarHooksNoJogo(c *Contexto, p Processo) {
+	r := c.R
+	modulos, err := intervalosDeModulos(p.PID)
+	if err != nil {
+		return
+	}
+	dono := func(endereco uint64) string {
+		for _, m := range modulos {
+			if endereco >= m.Base && endereco < m.Base+m.Tamanho {
+				return m.Nome
+			}
+		}
+		return ""
+	}
+	interessa := func(nome string) bool {
+		lower := strings.ToLower(nome)
+		for _, m := range modulosParaConferirNoDisco {
+			if lower == m {
+				return true
+			}
+		}
+		return false
+	}
+
+	var hooks []HookDetectado
+	conferidos := 0
+	for _, m := range modulos {
+		if !interessa(m.Nome) || m.Caminho == "" {
+			continue
+		}
+		if c.DevePular() {
+			break
+		}
+		noDisco, rva, err := secaoTextoNoDisco(m.Caminho)
+		if err != nil {
+			continue
+		}
+		naMemoria, err := lerMemoria(p.PID, m.Base+rva, len(noDisco))
+		if err != nil || len(naMemoria) != len(noDisco) {
+			continue
+		}
+		conferidos++
+		encontrados := 0
+		for i := 0; i < len(noDisco) && encontrados < 20; i++ {
+			if noDisco[i] == naMemoria[i] {
+				continue
+			}
+			fim := i + 16
+			if fim > len(naMemoria) {
+				fim = len(naMemoria)
+			}
+			endereco := m.Base + rva + uint64(i)
+			destino, ehDesvio := destinoDoDesvio(naMemoria[i:fim], endereco)
+			if !ehDesvio {
+				for i < len(noDisco) && noDisco[i] != naMemoria[i] {
+					i++
+				}
+				continue
+			}
+			encontrados++
+			h := HookDetectado{
+				Modulo: m.Nome, Deslocamento: rva + uint64(i), Endereco: endereco, Destino: destino,
+				BytesEmMemoria: emHexa(naMemoria[i:fim], 8), BytesNoDisco: emHexa(noDisco[i:fim], 8),
+			}
+			if destino != 0 {
+				h.ModuloDoDestino = dono(destino)
+				if h.ModuloDoDestino == "" {
+					h.TipoDoDestino, _, _ = descreverRegiao(p.PID, destino)
+				}
+			} else {
+				h.TipoDoDestino = "indireta (salto por ponteiro)"
+			}
+			if h.ModuloDoDestino == "" && (h.TipoDoDestino == "" || h.TipoDoDestino == "livre") {
+				encontrados--
+				for i < len(noDisco) && noDisco[i] != naMemoria[i] {
+					i++
+				}
+				continue
+			}
+			hooks = append(hooks, h)
+			for i < len(noDisco) && noDisco[i] != naMemoria[i] {
+				i++
+			}
+		}
+	}
+	r.Linha("%s (PID %d): %d dll(s) do Windows conferidas contra o arquivo em disco", p.Nome, p.PID, conferidos)
+	sinais := avaliarHooks(hooks, p.Nome)
+	for _, s := range sinais {
+		r.Add(s.Severidade, s.Titulo, s.Detalhe)
+	}
+	if len(sinais) == 0 && conferidos > 0 {
+		r.Ok("Nenhuma funcao do Windows desviada dentro de %s", p.Nome)
 	}
 }

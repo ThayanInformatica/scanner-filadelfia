@@ -32,6 +32,13 @@ de falha, atalhos e listas de arquivos recentes, nomes de arquivos nos discos fi
 Lista de processos com caminho, processo pai e assinatura digital, modulos carregados,
 janelas abertas, handles abertos no FiveM, e regioes de memoria executaveis do proprio FiveM.
 
+No processo do jogo a leitura e mais funda: alem das regioes de codigo, le tambem a memoria de
+dados, porque executor de Lua manda o script para dentro do jogo e o texto fica ali; confere se
+alguma thread do jogo comeca fora de qualquer dll registrada, que e o rastro de codigo carregado
+na marra; e compara o codigo de dez dll do Windows carregadas no jogo com o arquivo delas no
+disco, para achar funcao desviada. Nada disso e gravado: so entra no relatorio o endereco e o
+trecho de texto em volta de um nome de cheat, quando existe.
+
 Tambem le a memoria dos programas que nao sao do Windows e nao tem assinatura de antivirus,
 anticheat ou de fabricante conhecido, procurando nome de cheat. Navegador, Discord e
 programas de conversa ficam de fora de proposito: eles carregam na memoria o texto de

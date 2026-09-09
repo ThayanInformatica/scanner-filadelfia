@@ -4,6 +4,7 @@ package main
 
 import (
 	"bytes"
+	"debug/pe"
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
@@ -910,4 +911,208 @@ func streamsAlternativos(caminho string) []StreamOculto {
 		}
 	}
 	return lista
+}
+
+func varrerMemoriaDeDados(pid uint32, limiteBytes int64, fn func(RegiaoDeMemoria, []byte)) (int64, error) {
+	h, err := windows.OpenProcess(windows.PROCESS_QUERY_INFORMATION|windows.PROCESS_VM_READ, false, pid)
+	if err != nil {
+		return 0, err
+	}
+	defer windows.CloseHandle(h)
+
+	const pedaco = 8 * 1024 * 1024
+	buf := make([]byte, pedaco)
+	var endereco uintptr
+	var lidos int64
+	for limiteBytes <= 0 || lidos < limiteBytes {
+		var info infoRegiao
+		if err := windows.VirtualQueryEx(h, endereco, (*windows.MemoryBasicInformation)(unsafe.Pointer(&info)), unsafe.Sizeof(info)); err != nil || info.RegionSize == 0 {
+			break
+		}
+		proximo := info.BaseAddress + info.RegionSize
+		if proximo <= endereco {
+			break
+		}
+		if info.State == memCommit && info.Type == memPrivate && protecaoLegivel(info.Protect) && !protecaoExecutavel(info.Protect) {
+			for desloc := uintptr(0); desloc < info.RegionSize; desloc += pedaco {
+				tamanho := info.RegionSize - desloc
+				if tamanho > pedaco {
+					tamanho = pedaco
+				}
+				var lidosAqui uintptr
+				if err := windows.ReadProcessMemory(h, info.BaseAddress+desloc, &buf[0], tamanho, &lidosAqui); err != nil || lidosAqui == 0 {
+					break
+				}
+				lidos += int64(lidosAqui)
+				fn(RegiaoDeMemoria{Base: uint64(info.BaseAddress + desloc), Tamanho: uint64(lidosAqui), Protecao: nomeProtecao(info.Protect), Tipo: nomeTipoRegiao(info.Type), Privada: true}, buf[:lidosAqui])
+				if limiteBytes > 0 && lidos >= limiteBytes {
+					break
+				}
+			}
+		}
+		endereco = proximo
+	}
+	return lidos, nil
+}
+
+var (
+	ntdllDLL                     = windows.NewLazySystemDLL("ntdll.dll")
+	procNtQueryInformationThread = ntdllDLL.NewProc("NtQueryInformationThread")
+)
+
+const threadQuerySetWin32StartAddress = 9
+
+func enderecoInicialDaThread(tid uint32) uintptr {
+	h, err := windows.OpenThread(windows.THREAD_QUERY_INFORMATION, false, tid)
+	if err != nil {
+		return 0
+	}
+	defer windows.CloseHandle(h)
+	var endereco uintptr
+	var tamanho uint32
+	r, _, _ := procNtQueryInformationThread.Call(uintptr(h), threadQuerySetWin32StartAddress,
+		uintptr(unsafe.Pointer(&endereco)), unsafe.Sizeof(endereco), uintptr(unsafe.Pointer(&tamanho)))
+	if r != 0 {
+		return 0
+	}
+	return endereco
+}
+
+type ThreadDoProcesso struct {
+	TID     uint32
+	Inicial uint64
+}
+
+func listarThreads(pid uint32) ([]ThreadDoProcesso, error) {
+	snap, err := windows.CreateToolhelp32Snapshot(windows.TH32CS_SNAPTHREAD, 0)
+	if err != nil {
+		return nil, err
+	}
+	defer windows.CloseHandle(snap)
+	var te windows.ThreadEntry32
+	te.Size = uint32(unsafe.Sizeof(te))
+	var lista []ThreadDoProcesso
+	for err = windows.Thread32First(snap, &te); err == nil; err = windows.Thread32Next(snap, &te) {
+		if te.OwnerProcessID != pid {
+			continue
+		}
+		lista = append(lista, ThreadDoProcesso{TID: te.ThreadID, Inicial: uint64(enderecoInicialDaThread(te.ThreadID))})
+	}
+	return lista, nil
+}
+
+type IntervaloDeModulo struct {
+	Nome    string
+	Caminho string
+	Base    uint64
+	Tamanho uint64
+}
+
+type infoModulo struct {
+	BaseOfDll   uintptr
+	SizeOfImage uint32
+	EntryPoint  uintptr
+}
+
+var (
+	procEnumProcessModulesEx = psapi.NewProc("EnumProcessModulesEx")
+	procGetModuleInformation = psapi.NewProc("GetModuleInformation")
+	procGetModuleFileNameExW = psapi.NewProc("GetModuleFileNameExW")
+)
+
+func intervalosDeModulos(pid uint32) ([]IntervaloDeModulo, error) {
+	h, err := windows.OpenProcess(windows.PROCESS_QUERY_INFORMATION|windows.PROCESS_VM_READ, false, pid)
+	if err != nil {
+		return nil, err
+	}
+	defer windows.CloseHandle(h)
+
+	handles := make([]uintptr, 2048)
+	var precisa uint32
+	const listModulesAll = 0x03
+	r, _, e := procEnumProcessModulesEx.Call(uintptr(h), uintptr(unsafe.Pointer(&handles[0])),
+		uintptr(len(handles))*unsafe.Sizeof(handles[0]), uintptr(unsafe.Pointer(&precisa)), listModulesAll)
+	if r == 0 {
+		return nil, e
+	}
+	total := int(precisa) / int(unsafe.Sizeof(handles[0]))
+	if total > len(handles) {
+		total = len(handles)
+	}
+	var lista []IntervaloDeModulo
+	nome := make([]uint16, windows.MAX_LONG_PATH)
+	for i := 0; i < total; i++ {
+		var info infoModulo
+		if r, _, _ := procGetModuleInformation.Call(uintptr(h), handles[i], uintptr(unsafe.Pointer(&info)), unsafe.Sizeof(info)); r == 0 {
+			continue
+		}
+		caminho := ""
+		if n, _, _ := procGetModuleFileNameExW.Call(uintptr(h), handles[i], uintptr(unsafe.Pointer(&nome[0])), uintptr(len(nome))); n > 0 {
+			caminho = windows.UTF16ToString(nome[:n])
+		}
+		lista = append(lista, IntervaloDeModulo{Nome: filepath.Base(caminho), Caminho: caminho, Base: uint64(info.BaseOfDll), Tamanho: uint64(info.SizeOfImage)})
+	}
+	return lista, nil
+}
+
+func descreverRegiao(pid uint32, endereco uint64) (string, string, bool) {
+	h, err := windows.OpenProcess(windows.PROCESS_QUERY_INFORMATION, false, pid)
+	if err != nil {
+		return "", "", false
+	}
+	defer windows.CloseHandle(h)
+	var info infoRegiao
+	if err := windows.VirtualQueryEx(h, uintptr(endereco), (*windows.MemoryBasicInformation)(unsafe.Pointer(&info)), unsafe.Sizeof(info)); err != nil {
+		return "", "", false
+	}
+	if info.State != memCommit {
+		return "livre", "", false
+	}
+	return nomeTipoRegiao(info.Type), nomeProtecao(info.Protect), info.Type == memImage
+}
+
+func lerMemoria(pid uint32, endereco uint64, tamanho int) ([]byte, error) {
+	if tamanho <= 0 || tamanho > 64*1024*1024 {
+		return nil, fmt.Errorf("tamanho invalido")
+	}
+	h, err := windows.OpenProcess(windows.PROCESS_QUERY_INFORMATION|windows.PROCESS_VM_READ, false, pid)
+	if err != nil {
+		return nil, err
+	}
+	defer windows.CloseHandle(h)
+	buf := make([]byte, tamanho)
+	var lidos uintptr
+	if err := windows.ReadProcessMemory(h, uintptr(endereco), &buf[0], uintptr(tamanho), &lidos); err != nil {
+		return nil, err
+	}
+	return buf[:lidos], nil
+}
+
+func secaoTextoNoDisco(caminho string) ([]byte, uint64, error) {
+	arquivo, err := os.Open(caminho)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer arquivo.Close()
+	f, err := pe.NewFile(arquivo)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer f.Close()
+	s := f.Section(".text")
+	if s == nil {
+		return nil, 0, fmt.Errorf("modulo sem secao .text")
+	}
+	tamanho := s.VirtualSize
+	if s.Size < tamanho {
+		tamanho = s.Size
+	}
+	if tamanho == 0 || tamanho > 64*1024*1024 {
+		return nil, 0, fmt.Errorf("secao .text de tamanho improvavel")
+	}
+	dados := make([]byte, tamanho)
+	if _, err := arquivo.ReadAt(dados, int64(s.Offset)); err != nil {
+		return nil, 0, err
+	}
+	return dados, uint64(s.VirtualAddress), nil
 }
