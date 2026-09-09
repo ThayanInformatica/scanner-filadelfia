@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"syscall"
 	"time"
 )
 
@@ -389,13 +390,45 @@ func ehExecutavelDisfarcado(caminho string, d fs.DirEntry) bool {
 	return cabecalho[0] == 'M' && cabecalho[1] == 'Z'
 }
 
+func horaDeCriacaoDoArquivo(info os.FileInfo) time.Time {
+	if dados, ok := info.Sys().(*syscall.Win32FileAttributeData); ok {
+		return time.Unix(0, dados.CreationTime.Nanoseconds())
+	}
+	return time.Time{}
+}
+
+func estadoDaLicencaDoFiveM(perfil Perfil, fivemInstalado bool) EstadoDaLicencaDoFiveM {
+	e := EstadoDaLicencaDoFiveM{FiveMInstalado: fivemInstalado}
+	pasta := filepath.Join(perfil.Pasta, `AppData\Local\DigitalEntitlements`)
+	if info, err := os.Stat(pasta); err == nil && info.IsDir() {
+		e.PastaExiste = true
+		e.PastaCriadaEm = horaDeCriacaoDoArquivo(info)
+		if entradas, err := os.ReadDir(pasta); err == nil {
+			e.ArquivosDentro = len(entradas)
+		}
+	}
+	for _, raiz := range []string{os.Getenv("ProgramFiles(x86)"), os.Getenv("ProgramFiles")} {
+		if raiz == "" {
+			continue
+		}
+		if info, err := os.Stat(filepath.Join(raiz, "Blade Group")); err == nil && info.IsDir() {
+			e.PastaBladeGroupExiste = true
+		}
+	}
+	return e
+}
+
 func checarFiveM(c *Contexto) {
 	r := c.R
 	r.Secao("FIVEM")
 	encontrado := false
 	for _, p := range c.Perfis {
 		app := filepath.Join(p.Pasta, `AppData\Local\FiveM\FiveM.app`)
-		if _, err := os.Stat(app); err != nil {
+		_, errApp := os.Stat(app)
+		for _, s := range avaliarLicencaDoFiveM(estadoDaLicencaDoFiveM(p, errApp == nil), c.Instalacao, time.Now()) {
+			r.Add(s.Severidade, s.Titulo, s.Detalhe)
+		}
+		if errApp != nil {
 			continue
 		}
 		encontrado = true

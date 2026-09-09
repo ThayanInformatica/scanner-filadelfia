@@ -19,6 +19,9 @@ func checarJournalDoDisco(c *Contexto) {
 	r := c.R
 	buscador := NovoBuscador(append(append([]string{}, c.A.Marcas...), c.A.Cheats...))
 	interessa := func(nome string) bool {
+		if executavelDeNomeAleatorio(nome) {
+			return true
+		}
 		achou := false
 		buscador.Procurar([]byte(nome), func(o Ocorrencia) bool { achou = true; return false })
 		return achou
@@ -60,6 +63,7 @@ func checarJournalDoDisco(c *Contexto) {
 		}
 		r.Linha("Journal de %s: %d registros lidos em %s", letra, total, time.Since(inicio).Round(time.Second))
 		sinais := avaliarUSN(letra, eventos, total, c.A)
+		sinais = append(sinais, avaliarAutodestruicaoNoJournal(letra, eventos, time.Now())...)
 		for _, s := range sinais {
 			r.Add(s.Severidade, s.Titulo, s.Detalhe)
 		}

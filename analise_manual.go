@@ -245,3 +245,57 @@ func pontoDePartidaUSN(saidaQueryJournal string, janela uint64) uint64 {
 	}
 	return inicio
 }
+
+type EstadoDaLicencaDoFiveM struct {
+	FiveMInstalado        bool
+	PastaExiste           bool
+	PastaCriadaEm         time.Time
+	ArquivosDentro        int
+	PastaBladeGroupExiste bool
+}
+
+func avaliarLicencaDoFiveM(e EstadoDaLicencaDoFiveM, instalacao, agora time.Time) []Sinal {
+	var sinais []Sinal
+	if e.PastaBladeGroupExiste {
+		sinais = append(sinais, Sinal{Critico, "Pasta 'Blade Group' em Program Files (x86): marca do Fivem-Bypass", "Esse bypass publico apaga a licenca do FiveM e o ID da GPU para tentar escapar de ban, e cria essa pasta como parte do processo. Nao existe programa legitimo com esse nome", "cheat"})
+	}
+	if !e.FiveMInstalado {
+		return sinais
+	}
+	antigo := !instalacao.IsZero() && agora.Sub(instalacao) > 7*24*time.Hour
+	switch {
+	case !e.PastaExiste && antigo:
+		sinais = append(sinais, Sinal{Alerta, "Licenca do FiveM (DigitalEntitlements) NAO EXISTE com o FiveM instalado", "A pasta AppData\\Local\\DigitalEntitlements guarda a licenca ROS e e criada no primeiro login. Apagar essa pasta e o passo 1 de todo tutorial de 'unban' e de todo cleaner de rastro. So some se alguem apagou", "suspeito"})
+	case e.PastaExiste && !e.PastaCriadaEm.IsZero() && antigo && agora.Sub(e.PastaCriadaEm) < 7*24*time.Hour:
+		sinais = append(sinais, Sinal{Alerta, "Licenca do FiveM (DigitalEntitlements) foi recriada em " + formataHora(e.PastaCriadaEm), "A pasta existe, mas foi criada ha menos de 7 dias num Windows instalado em " + formataHora(instalacao) + ". A pasta antiga foi apagada e o FiveM criou outra no login seguinte: padrao de spoofer e de cleaner de rastro", "suspeito"})
+	}
+	return sinais
+}
+
+func executavelDeNomeAleatorio(nome string) bool {
+	lower := strings.ToLower(nome)
+	if !strings.HasSuffix(lower, ".exe") && !strings.HasSuffix(lower, ".dll") && !strings.HasSuffix(lower, ".sys") {
+		return false
+	}
+	return pareceNomeAleatorio(nome)
+}
+
+func avaliarAutodestruicaoNoJournal(volume string, eventos []EventoUSN, agora time.Time) []Sinal {
+	var linhas []string
+	vistos := map[string]bool{}
+	for _, e := range eventos {
+		if e.Motivo != "apagado" || !executavelDeNomeAleatorio(e.Nome) || vistos[strings.ToLower(e.Nome)] {
+			continue
+		}
+		if e.Hora.IsZero() || agora.Sub(e.Hora) > 72*time.Hour || e.Hora.After(agora.Add(time.Hour)) {
+			continue
+		}
+		vistos[strings.ToLower(e.Nome)] = true
+		linhas = append(linhas, fmt.Sprintf("%s  %s", formataHora(e.Hora), e.Nome))
+	}
+	if len(linhas) < 2 {
+		return nil
+	}
+	sort.Strings(linhas)
+	return []Sinal{{Alerta, fmt.Sprintf("%d executavel(is) de nome aleatorio apagados do disco %s nas ultimas 72h", len(linhas), volume), strings.Join(limitaLinhas(linhas, 40), "\n") + "\nLoader de cheat e cleaner de rastro rodam com nome aleatorio e se apagam depois (self destruct). Instalador legitimo tambem cria e apaga temporario, entao confira com o Amcache e o BAM o que esses arquivos eram", "suspeito"}}
+}
