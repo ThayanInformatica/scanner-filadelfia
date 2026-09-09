@@ -62,6 +62,7 @@ func checarProcessos(c *Contexto) {
 
 	r.Progresso("Conferindo assinatura digital de %d executaveis fora do Windows", len(candidatosAssinatura))
 	assinaturas := assinaturasAuthenticode(candidatosAssinatura)
+	c.AssinaturasDeProcessos = assinaturas
 	for i := range infos {
 		if v, ok := assinaturas[strings.ToLower(infos[i].Caminho)]; ok {
 			infos[i].Assinatura = v[0]

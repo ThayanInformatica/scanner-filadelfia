@@ -36,6 +36,7 @@ type Assinaturas struct {
 	ControleRemoto   []string          `json:"controle_remoto"`
 	ProcessosSistema map[string]string `json:"processos_sistema"`
 	SysDoSistema     []string          `json:"sys_do_sistema"`
+	Hashes           []string          `json:"hashes"`
 
 	cheats         []termo
 	ferramentas    []termo
@@ -45,6 +46,7 @@ type Assinaturas struct {
 	marcas         []termo
 	controleRemoto []termo
 	drivers        map[string]bool
+	hashes         map[string]string
 }
 
 type termo struct {
@@ -131,7 +133,35 @@ func montarAssinaturas(dados []byte, origem string) (*Assinaturas, string, error
 	for i, p := range a.IgnorarCaminhos {
 		a.IgnorarCaminhos[i] = strings.ToLower(p)
 	}
+	a.hashes = indexaHashes(a.Hashes)
 	return &a, origem, nil
+}
+
+func indexaHashes(lista []string) map[string]string {
+	idx := map[string]string{}
+	for _, linha := range lista {
+		campos := strings.Fields(linha)
+		if len(campos) == 0 {
+			continue
+		}
+		hex := strings.ToLower(campos[0])
+		for _, prefixo := range []string{"sha256:", "sha1:", "md5:"} {
+			hex = strings.TrimPrefix(hex, prefixo)
+		}
+		if len(hex) != 40 && len(hex) != 64 && len(hex) != 32 {
+			continue
+		}
+		rotulo := "hash de cheat conhecido"
+		if len(campos) > 1 {
+			rotulo = strings.Join(campos[1:], " ")
+		}
+		idx[hex] = rotulo
+	}
+	return idx
+}
+
+func (a *Assinaturas) HashConhecido(hex string) string {
+	return a.hashes[strings.ToLower(strings.TrimSpace(hex))]
 }
 
 func compilaTermos(lista []string) []termo {

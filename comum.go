@@ -1,8 +1,11 @@
 package main
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -379,6 +382,22 @@ var caminhoDoProprioExe = func() string {
 	}
 	return strings.ToLower(exe)
 }()
+
+func sha256DoArquivo(caminho string, maxBytes int64) string {
+	f, err := os.Open(caminho)
+	if err != nil {
+		return ""
+	}
+	defer f.Close()
+	if info, err := f.Stat(); err != nil || (maxBytes > 0 && info.Size() > maxBytes) {
+		return ""
+	}
+	h := sha256.New()
+	if _, err := io.Copy(h, f); err != nil {
+		return ""
+	}
+	return hex.EncodeToString(h.Sum(nil))
+}
 
 func ehOProprioScanner(caminho string, pid int) bool {
 	if pid != 0 && pid == os.Getpid() {

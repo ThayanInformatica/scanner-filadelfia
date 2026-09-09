@@ -286,6 +286,12 @@ func checarArquivos(c *Contexto) {
 			}
 			if quente {
 				if ext == ".exe" || ext == ".dll" {
+					if h := sha256DoArquivo(caminho, 64*1024*1024); h != "" {
+						if rotulo := c.A.HashConhecido(h); rotulo != "" {
+							r.Add(Critico, "Arquivo com HASH de cheat conhecido: "+d.Name(), caminho+"\nSHA256: "+h+"\nBate com: "+rotulo+"\nO hash nao muda quando o arquivo e renomeado")
+							return nil
+						}
+					}
 					if pareceNomeAleatorio(d.Name()) {
 						r.Add(Alerta, "Executavel com nome aleatorio: "+d.Name(), caminho)
 						return nil

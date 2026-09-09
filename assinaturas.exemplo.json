@@ -167,5 +167,8 @@
     "boot.sys",
     "dumpstack.log.tmp",
     "memory.dmp"
+  ],
+  "hashes": [
+    "sha256:0000000000000000000000000000000000000000000000000000000000000000 exemplo de loader (troque pelo hash real)"
   ]
 }

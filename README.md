@@ -32,6 +32,8 @@ Sem codigo, tudo continua funcionando, so fica local.
 - Servico de protecao parado, log apagado, Prefetch desligado, journal do NTFS zerado.
 - Hardware de trapaca, como placa DMA e adaptador de mouse e teclado.
 - Rastro em navegador, Discord e pacote compactado.
+- Programa que ja rodou e foi apagado, pelo Amcache, com hash para pegar loader renomeado.
+- Cheat externo: nome de cheat na memoria de qualquer processo sem assinatura confiavel.
 
 Um resultado critico e indicio forte, nao prova. A ferramenta foi feita para embasar
 conversa com o jogador, nao para banir sozinha.
@@ -68,6 +70,12 @@ painel, ou passe com `-assinaturas caminho.json`.
 O servico de autorizacao esta em [`servidor/`](servidor/). E um binario Go com Postgres, com
 painel web para a equipe gerar codigo, acompanhar quem usou e abrir os relatorios recebidos.
 As instrucoes de instalacao estao no [servidor/LEIAME.md](servidor/LEIAME.md).
+
+## Testar em um Windows de verdade
+
+A pasta [`teste/`](teste/) tem um roteiro que planta evidencias falsas numa maquina, roda o
+scanner e confere se cada uma apareceu no relatorio. E o teste de regressao do projeto: vale
+rodar numa maquina virtual antes de cada versao.
 
 ## Rodar os testes
 

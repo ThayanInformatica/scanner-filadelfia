@@ -152,3 +152,60 @@ func avaliarFechamentoRecente(taskmgrAbertoEm time.Time, agora time.Time, cheatR
 	}
 	return []Sinal{{sev, "Gerenciador de Tarefas foi aberto pouco antes da checagem", detalhe, ""}}
 }
+
+var processosQueMostramConteudoAlheio = []string{
+	"chrome.exe", "msedge.exe", "firefox.exe", "brave.exe", "opera.exe", "opera_gx.exe", "vivaldi.exe", "chromium.exe",
+	"discord.exe", "discordptb.exe", "discordcanary.exe", "telegram.exe", "whatsapp.exe", "spotify.exe",
+	"searchhost.exe", "searchapp.exe", "windowsterminal.exe", "conhost.exe", "openconsole.exe",
+}
+
+var assinantesDeProtecao = []string{
+	"easyanticheat", "epic games", "battleye", "faceit", "riot games", "vanguard", "valve", "malwarebytes",
+	"kaspersky", "avast", "avg technologies", "bitdefender", "eset", "norton", "nortonlifelock", "gen digital",
+	"mcafee", "sophos", "trend micro", "webroot", "panda security", "f-secure", "crowdstrike", "sentinelone",
+	"cylance", "blackberry", "microsoft", "cfx.re", "citizenfx",
+}
+
+func processoForaDaVarreduraDeMemoria(nome, caminho, assinante string) bool {
+	lower := strings.ToLower(nome)
+	for _, p := range processosQueMostramConteudoAlheio {
+		if lower == p {
+			return true
+		}
+	}
+	if strings.HasPrefix(lower, "fivem") {
+		return true
+	}
+	if caminho == "" {
+		return true
+	}
+	lowerCaminho := strings.ToLower(strings.ReplaceAll(caminho, "/", `\`))
+	if strings.Contains(lowerCaminho, `\windows\`) || strings.Contains(lowerCaminho, `\windowsapps\`) {
+		return true
+	}
+	ass := strings.ToLower(assinante)
+	for _, a := range assinantesDeProtecao {
+		if strings.Contains(ass, a) {
+			return true
+		}
+	}
+	return false
+}
+
+func avaliarMemoriaDeProcesso(nome, caminho, statusAssinatura, assinante string, termos []string, contexto string) []Sinal {
+	if len(termos) == 0 {
+		return nil
+	}
+	sort.Strings(termos)
+	lista := strings.Join(termos, ", ")
+	detalhe := caminho + "\nTermos na memoria: " + lista
+	if contexto != "" {
+		detalhe += "\n..." + contexto + "..."
+	}
+	if strings.EqualFold(statusAssinatura, "Valid") && assinante != "" {
+		detalhe += "\nO programa tem assinatura digital valida de '" + assinante + "'. Pode ser um documento ou texto sobre cheat aberto dentro dele, e nao o cheat em si. Confira o que esta aberto nesse programa"
+		return []Sinal{{Alerta, fmt.Sprintf("Texto de cheat ('%s') na memoria de %s, programa assinado", termos[0], nome), detalhe, "suspeito"}}
+	}
+	detalhe += "\nO programa nao tem assinatura digital valida e carrega nome de cheat na memoria. E o padrao de cheat externo (overlay, aimbot por processo separado) e de loader renomeado"
+	return []Sinal{{Critico, fmt.Sprintf("String de cheat ('%s') NA MEMORIA de %s", termos[0], nome), detalhe, "cheat"}}
+}

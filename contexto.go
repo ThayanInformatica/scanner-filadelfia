@@ -17,11 +17,12 @@ type Contexto struct {
 	pular       atomic.Bool
 	pulou       atomic.Bool
 
-	SysMainDesativado bool
-	JogoFechado       bool
-	JogoAbriuEm       time.Time
-	TaskmgrAbertoEm   time.Time
-	Execucoes         []EventoDeExecucao
+	SysMainDesativado      bool
+	JogoFechado            bool
+	JogoAbriuEm            time.Time
+	TaskmgrAbertoEm        time.Time
+	Execucoes              []EventoDeExecucao
+	AssinaturasDeProcessos map[string][2]string
 }
 
 func (c *Contexto) PedirParaPular() {

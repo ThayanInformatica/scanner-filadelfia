@@ -731,6 +731,56 @@ func nomeTipoRegiao(t uint32) string {
 	return fmt.Sprintf("0x%X", t)
 }
 
+func protecaoLegivel(p uint32) bool {
+	if p&pageGuard != 0 {
+		return false
+	}
+	base := p &^ uint32(pageGuard|0x200|0x400)
+	return base != 0 && base != 0x01
+}
+
+func varrerMemoriaLegivel(pid uint32, limiteBytes int64, fn func(RegiaoDeMemoria, []byte)) (int64, error) {
+	h, err := windows.OpenProcess(windows.PROCESS_QUERY_INFORMATION|windows.PROCESS_VM_READ, false, pid)
+	if err != nil {
+		return 0, err
+	}
+	defer windows.CloseHandle(h)
+
+	const pedaco = 8 * 1024 * 1024
+	buf := make([]byte, pedaco)
+	var endereco uintptr
+	var lidos int64
+	for limiteBytes <= 0 || lidos < limiteBytes {
+		var info infoRegiao
+		if err := windows.VirtualQueryEx(h, endereco, (*windows.MemoryBasicInformation)(unsafe.Pointer(&info)), unsafe.Sizeof(info)); err != nil || info.RegionSize == 0 {
+			break
+		}
+		proximo := info.BaseAddress + info.RegionSize
+		if proximo <= endereco {
+			break
+		}
+		if info.State == memCommit && info.Type == memPrivate && protecaoLegivel(info.Protect) {
+			for desloc := uintptr(0); desloc < info.RegionSize; desloc += pedaco {
+				tamanho := info.RegionSize - desloc
+				if tamanho > pedaco {
+					tamanho = pedaco
+				}
+				var lidosAqui uintptr
+				if err := windows.ReadProcessMemory(h, info.BaseAddress+desloc, &buf[0], tamanho, &lidosAqui); err != nil || lidosAqui == 0 {
+					break
+				}
+				lidos += int64(lidosAqui)
+				fn(RegiaoDeMemoria{Base: uint64(info.BaseAddress + desloc), Tamanho: uint64(lidosAqui), Protecao: nomeProtecao(info.Protect), Tipo: nomeTipoRegiao(info.Type), Privada: true}, buf[:lidosAqui])
+				if limiteBytes > 0 && lidos >= limiteBytes {
+					break
+				}
+			}
+		}
+		endereco = proximo
+	}
+	return lidos, nil
+}
+
 func varrerMemoriaExecutavel(pid uint32, limiteBytes int64, fn func(RegiaoDeMemoria, []byte)) error {
 	_, err := varrerMemoriaExecutavelContando(pid, limiteBytes, fn)
 	return err

@@ -31,7 +31,19 @@ de falha, atalhos e listas de arquivos recentes, nomes de arquivos nos discos fi
 **Processos e memoria** (`checks_processos.go`, `checks_memoria.go`)
 Lista de processos com caminho, processo pai e assinatura digital, modulos carregados,
 janelas abertas, handles abertos no FiveM, e regioes de memoria executaveis do proprio FiveM.
-So do FiveM. Nenhum outro programa tem a memoria lida.
+
+Tambem le a memoria dos programas que nao sao do Windows e nao tem assinatura de antivirus,
+anticheat ou de fabricante conhecido, procurando nome de cheat. Navegador, Discord e
+programas de conversa ficam de fora de proposito: eles carregam na memoria o texto de
+qualquer pagina ou conversa aberta, e isso nao diz nada sobre cheat. A leitura e feita na
+memoria e descartada: nenhum trecho e gravado alem do pedaco de texto em volta de um nome
+de cheat, quando existe.
+
+**Historico de execucao com hash** (`checks_amcache.go`)
+Le o Amcache.hve, o registro que o Windows mantem de todo programa que ja executou, com o
+hash SHA1 de cada um. Serve para achar loader que rodou e foi apagado, e para bater hash de
+cheat conhecido mesmo com o arquivo renomeado. Tambem calcula o SHA256 dos executaveis das
+pastas de download, area de trabalho e temporarios.
 
 **Conteudo de arquivo** (`checks_conteudo.go`, `checks_pacotes.go`)
 Le o conteudo de arquivos procurando nomes de cheat conhecidos, e lista o que existe dentro

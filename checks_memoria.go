@@ -63,6 +63,8 @@ func checarMemoriaDoJogo(c *Contexto) {
 		}
 	}
 
+	checarMemoriaDosOutrosProcessos(c, processos, buscador)
+
 	agora := time.Now()
 	sinais := avaliarLinhaDoTempo(c.JogoAbriuEm, agora, c.Execucoes, c.A)
 	for _, s := range sinais {
@@ -108,5 +110,71 @@ func checarMemoriaDoJogo(c *Contexto) {
 		if len(linhas) > 0 {
 			r.Add(Info, fmt.Sprintf("Programas fora do Windows executados nas ultimas 6 horas: %d", len(linhas)), strings.Join(limitaLinhas(linhas, 160), "\n"))
 		}
+	}
+}
+
+func checarMemoriaDosOutrosProcessos(c *Contexto, processos []Processo, buscador *Buscador) {
+	r := c.R
+	r.Secao("MEMORIA DOS OUTROS PROCESSOS (cheat externo e loader renomeado)")
+	var alvos []Processo
+	for _, p := range processos {
+		if ehOProprioScanner(p.Caminho, int(p.PID)) {
+			continue
+		}
+		var status, assinante string
+		if v, ok := c.AssinaturasDeProcessos[strings.ToLower(p.Caminho)]; ok {
+			status, assinante = v[0], v[1]
+		}
+		if processoForaDaVarreduraDeMemoria(p.Nome, p.Caminho, assinante) {
+			continue
+		}
+		_ = status
+		alvos = append(alvos, p)
+	}
+	r.Linha("%d processos fora do Windows e fora das protecoes conhecidas para varrer na memoria", len(alvos))
+	if len(alvos) == 0 {
+		return
+	}
+	achou := 0
+	var totalMB int64
+	inicio := time.Now()
+	for i, p := range alvos {
+		if c.DevePular() {
+			r.Linha("Varredura de memoria dos processos interrompida a pedido em %d de %d", i, len(alvos))
+			break
+		}
+		r.Progresso("Memoria %d de %d: %s (PID %d)", i+1, len(alvos), p.Nome, p.PID)
+		termosVistos := map[string]bool{}
+		var termos []string
+		contexto := ""
+		lidos, err := varrerMemoriaLegivel(p.PID, 768*1024*1024, func(regiao RegiaoDeMemoria, dados []byte) {
+			buscador.Procurar(dados, func(o Ocorrencia) bool {
+				if termosVistos[o.Termo] {
+					return true
+				}
+				termosVistos[o.Termo] = true
+				termos = append(termos, o.Termo)
+				if contexto == "" {
+					contexto = trechoEmVolta(dados, o.Inicio, o.Fim, o.UTF16)
+				}
+				return len(termos) < 5
+			})
+		})
+		totalMB += lidos / 1024 / 1024
+		if err != nil {
+			continue
+		}
+		var status, assinante string
+		if v, ok := c.AssinaturasDeProcessos[strings.ToLower(p.Caminho)]; ok {
+			status, assinante = v[0], v[1]
+		}
+		for _, s := range avaliarMemoriaDeProcesso(p.Nome, p.Caminho, status, assinante, termos, contexto) {
+			achou++
+			r.Add(s.Severidade, s.Titulo, s.Detalhe)
+		}
+	}
+	r.Linha("%d MB de memoria lidos em %d processos em %s", totalMB, len(alvos), time.Since(inicio).Round(time.Second))
+	if achou == 0 && !c.Pulou() {
+		r.Ok("Nenhum processo fora do Windows carrega nome de cheat na memoria")
 	}
 }
