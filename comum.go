@@ -333,9 +333,11 @@ func recursoDeServidorFiveM(caminho string, existe func(string) bool) bool {
 }
 
 var marcasDeRelatorioDoScanner = []string{
-	"bate com assinatura", "[critico]", "[alerta]", "scanner filadelfia", "nenhuma placa dma",
-	"drivers mapeados manualmente", "indicios fortes de trapaca", "nenhum indicio forte", "etapa pulada a pedido",
-	"varredura incompleta", "o scanner abriu o pacote",
+	"bate com assinatura", "[critico]", "[alerta]", "[ok]", "scanner filadelfia", "nenhuma placa dma",
+	"drivers mapeados manualmente", "drivers dessa lista sao abusados", "indicios fortes de trapaca",
+	"nenhum indicio forte", "etapa pulada a pedido", "varredura incompleta", "o scanner abriu o pacote",
+	"sobrevive a limpador de rastro", "registro de execucao e o que mostra", "o que ainda registra execucao",
+	"pc possivelmente", "conferidas contra o arquivo em disco", "duracao da analise",
 }
 
 func contextoDeRelatorioDoScanner(texto string) bool {
@@ -349,6 +351,38 @@ func contextoDeRelatorioDoScanner(texto string) bool {
 }
 
 var reArquivoDeRelatorioDoScanner = regexp.MustCompile(`(?i)^scanner-.+-\d{8}-\d{4,6}\.(txt|json)$`)
+
+var pastaDoProprioKit = func() string {
+	if caminhoDoProprioExe == "" {
+		return ""
+	}
+	i := strings.LastIndexAny(caminhoDoProprioExe, `\/`)
+	if i <= 0 {
+		return ""
+	}
+	return caminhoDoProprioExe[:i+1]
+}()
+
+var arquivosDoProprioKit = map[string]bool{
+	"plantar.ps1": true, "desplantar.ps1": true, "verificar.exe": true, "plantio.json": true,
+	"assinaturas.exemplo.json": true, "transparencia.md": true, "leiame.txt": true, "so-para-a-equipe.txt": true,
+	"sha256sums.txt": true, "leiame.md": true,
+}
+
+func arquivoDoProprioKit(caminho string) bool {
+	if pastaDoProprioKit == "" {
+		return false
+	}
+	lower := strings.ToLower(caminho)
+	if !strings.HasPrefix(lower, pastaDoProprioKit) {
+		return false
+	}
+	base := lower
+	if i := strings.LastIndexAny(base, `\/`); i >= 0 {
+		base = base[i+1:]
+	}
+	return arquivosDoProprioKit[base]
+}
 
 func arquivoDeRelatorioDoScanner(nome string) bool {
 	if i := strings.LastIndexAny(nome, `\/`); i >= 0 {

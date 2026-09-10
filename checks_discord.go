@@ -29,12 +29,13 @@ type achadoDiscord struct {
 }
 
 type resultadoDiscord struct {
-	Arquivos     int
-	Interrompido bool
-	Bytes        int64
-	Mencoes      []achadoDiscord
-	Anexos       map[string]string
-	Convites     map[string]string
+	RelatoriosColados int
+	Arquivos          int
+	Interrompido      bool
+	Bytes             int64
+	Mencoes           []achadoDiscord
+	Anexos            map[string]string
+	Convites          map[string]string
 }
 
 func analisarPastaDiscord(a *Assinaturas, raiz string, limite time.Duration, progresso informaProgresso) resultadoDiscord {
@@ -75,6 +76,10 @@ func analisarPastaDiscordCancelavel(a *Assinaturas, raiz string, limite time.Dur
 			}
 			res.Arquivos++
 			res.Bytes += int64(len(dados))
+			if contextoDeRelatorioDoScanner(string(dados)) {
+				res.RelatoriosColados++
+				return nil
+			}
 
 			for _, m := range reAnexoDiscord.FindAllSubmatch(dados, -1) {
 				nome := string(m[1])
@@ -157,7 +162,7 @@ func relatarDiscord(c *Contexto, usuario, nome, raiz string) {
 
 	porTermo := map[string][]achadoDiscord{}
 	var termos []string
-	relatoriosColados := 0
+	relatoriosColados := res.RelatoriosColados
 	for _, m := range res.Mencoes {
 		if contextoDeRelatorioDoScanner(m.Contexto) {
 			relatoriosColados++
@@ -170,7 +175,7 @@ func relatarDiscord(c *Contexto, usuario, nome, raiz string) {
 	}
 	sort.Strings(termos)
 	if relatoriosColados > 0 {
-		r.Linha("%d trecho(s) do cache eram relatorio deste scanner colado no Discord, ignorados", relatoriosColados)
+		r.Linha("%d arquivo(s) do cache eram relatorio deste scanner colado no Discord, ignorados", relatoriosColados)
 	}
 	for _, t := range termos {
 		lista := porTermo[t]

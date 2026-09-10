@@ -239,9 +239,9 @@ func checarArquivos(c *Contexto) {
 	var mu sync.Mutex
 	var porHash []achadoDeHash
 	var wg sync.WaitGroup
-	trabalhadores := runtime.NumCPU()
-	if trabalhadores > 8 {
-		trabalhadores = 8
+	trabalhadores := runtime.NumCPU() / 2
+	if trabalhadores > 4 {
+		trabalhadores = 4
 	}
 	if trabalhadores < 2 {
 		trabalhadores = 2
@@ -255,7 +255,7 @@ func checarArquivos(c *Contexto) {
 					continue
 				}
 				if t.conferirHash {
-					h := sha256DoArquivo(t.caminho, 32*1024*1024)
+					h := sha256DoArquivo(t.caminho, 16*1024*1024)
 					if h == "" {
 						continue
 					}
@@ -308,7 +308,7 @@ func checarArquivos(c *Contexto) {
 				}
 				return nil
 			}
-			if vistos[lower] || c.A.Ignorar(lower) || ehOProprioScanner(caminho, 0) {
+			if vistos[lower] || c.A.Ignorar(lower) || ehOProprioScanner(caminho, 0) || arquivoDoProprioKit(caminho) {
 				return nil
 			}
 			vistos[lower] = true
@@ -357,7 +357,9 @@ func checarArquivos(c *Contexto) {
 			if quente {
 				if ext == ".exe" || ext == ".dll" {
 					if c.A.TemHashes() {
-						enfileira(tarefaDeArquivo{caminho: caminho, nome: d.Name(), conferirHash: true})
+						if info, err := d.Info(); err == nil && info.Size() <= 16*1024*1024 {
+							enfileira(tarefaDeArquivo{caminho: caminho, nome: d.Name(), conferirHash: true})
+						}
 					}
 					if pareceNomeAleatorio(d.Name()) {
 						r.Add(Alerta, "Executavel com nome aleatorio: "+d.Name(), caminho)

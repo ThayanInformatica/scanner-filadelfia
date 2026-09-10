@@ -62,6 +62,7 @@ func iniciarSessaoETW(etl string, aoVivo func(string)) (func(), error) {
 
 	executar("logman", "stop", nomeSessaoScanner)
 	executar("logman", "delete", nomeSessaoScanner)
+	etl = pastaDeCapturaDoServico(etl)
 	argsDCS := []string{"create", "trace", nomeSessaoScanner,
 		"-p", "Microsoft-Windows-Kernel-Process", "0x50", "win:Informational",
 		"-p", "Microsoft-Windows-DNS-Client", "0xffffffffffffffff", "win:Informational",
@@ -284,4 +285,23 @@ func checarETW(c *Contexto) {
 	if len(carregadas) > 0 {
 		r.Add(Info, fmt.Sprintf("DLLs/EXEs fora do Windows carregados durante a captura: %d", len(carregadas)), strings.Join(limitaLinhas(carregadas, 120), "\n"))
 	}
+}
+
+func pastaDeCapturaDoServico(padrao string) string {
+	perflogs := filepath.Join(os.Getenv("SystemDrive")+`\`, "PerfLogs")
+	if perflogs == `\PerfLogs` {
+		perflogs = `C:\PerfLogs`
+	}
+	if err := os.MkdirAll(perflogs, 0o755); err != nil {
+		return padrao
+	}
+	alvo := filepath.Join(perflogs, "scanner-captura.etl")
+	os.Remove(alvo)
+	f, err := os.Create(alvo)
+	if err != nil {
+		return padrao
+	}
+	f.Close()
+	os.Remove(alvo)
+	return alvo
 }

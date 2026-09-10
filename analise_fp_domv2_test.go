@@ -114,3 +114,56 @@ func TestLerUSNCsvIgnoraLinhasDeErro(t *testing.T) {
 		t.Fatalf("linhas de erro nao contam como registro: total=%d eventos=%d err=%v", total, len(eventos), err)
 	}
 }
+
+func TestSelfDestructENomesDoKitNaoAcusam(t *testing.T) {
+	a := assinaturasDeTeste(t)
+	for _, texto := range []string{
+		"if (!$NonDestructive) { # Self destruct! Remove-Item function:deactivate }",
+		"# Self destruct! unset -f deactivate",
+	} {
+		if classe, termo := a.Classificar(texto); classe != SemMatch {
+			t.Errorf("script de virtualenv nao pode casar (casou com %q): %q", termo, texto)
+		}
+	}
+	for _, termo := range a.TermosParaConteudo() {
+		if strings.EqualFold(termo, "self destruct") || strings.EqualFold(termo, "selfdestruct") {
+			t.Errorf("%q nao pode estar na busca de conteudo: aparece em todo activate.ps1 do Python", termo)
+		}
+	}
+}
+
+func TestRelatorioColadoNoDiscordEhReconhecido(t *testing.T) {
+	for _, trecho := range []string{
+		"Sobrevive a limpador de rastro e a exclusao do arquivo [OK] Nenhum programa com nome ou hash de cheat",
+		"RTCore64.sys Drivers dessa lista sao abusados por kdmapper e afins para injetar cheat no kernel",
+		"PC POSSIVELMENTE 'STOPADO': 3 registro(s) de execucao desligados",
+		"Duracao da analise: 20m19s",
+		"10 dll(s) do Windows conferidas contra o arquivo em disco",
+	} {
+		if !contextoDeRelatorioDoScanner(trecho) {
+			t.Errorf("trecho de relatorio nao reconhecido: %q", trecho)
+		}
+	}
+	if contextoDeRelatorioDoScanner("mano me passa o eulen ai, discord.gg/xyz") {
+		t.Error("conversa de verdade nao pode ser confundida com relatorio")
+	}
+}
+
+func TestProcessoDeSistemaForaDaVarreduraDeMemoria(t *testing.T) {
+	casos := []struct {
+		caminho, assinante string
+		fora               bool
+	}{
+		{`C:\Program Files\Common Files\microsoft shared\ink\TabTip.exe`, "", true},
+		{`C:\Windows\System32\svchost.exe`, "", true},
+		{`C:\Program Files (x86)\Steam\Steam.exe`, "CN=Valve Corp.", true},
+		{`C:\Program Files\obs-studio\bin\64bit\obs64.exe`, "CN=Hugh Bailey", false},
+		{`C:\Users\Dom\AppData\Roaming\xk9.exe`, "", false},
+	}
+	for _, c := range casos {
+		nome := c.caminho[strings.LastIndex(c.caminho, `\`)+1:]
+		if got := processoForaDaVarreduraDeMemoria(nome, c.caminho, c.assinante); got != c.fora {
+			t.Errorf("%s: fora=%v, esperado %v", nome, got, c.fora)
+		}
+	}
+}

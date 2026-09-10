@@ -167,21 +167,23 @@ var assinantesDeProtecao = []string{
 }
 
 func processoForaDaVarreduraDeMemoria(nome, caminho, assinante string) bool {
-	lower := strings.ToLower(nome)
+	lowerNome := strings.ToLower(nome)
 	for _, p := range processosQueMostramConteudoAlheio {
-		if lower == p {
+		if lowerNome == p {
 			return true
 		}
 	}
-	if strings.HasPrefix(lower, "fivem") {
+	if strings.HasPrefix(lowerNome, "fivem") {
 		return true
 	}
 	if caminho == "" {
 		return true
 	}
-	lowerCaminho := strings.ToLower(strings.ReplaceAll(caminho, "/", `\`))
-	if strings.Contains(lowerCaminho, `\windows\`) || strings.Contains(lowerCaminho, `\windowsapps\`) {
-		return true
+	lower := strings.ToLower(strings.ReplaceAll(caminho, "/", `\`))
+	for _, pasta := range []string{`\windows\`, `\windowsapps\`, `\program files\common files\`, `\program files (x86)\common files\`} {
+		if strings.Contains(lower, pasta) {
+			return true
+		}
 	}
 	ass := strings.ToLower(assinante)
 	for _, a := range assinantesDeProtecao {

@@ -122,6 +122,29 @@ func checarMemoriaDoJogo(c *Contexto) {
 func checarMemoriaDosOutrosProcessos(c *Contexto, processos []Processo, buscador *Buscador) {
 	r := c.R
 	r.Secao("MEMORIA DOS OUTROS PROCESSOS (cheat externo e loader renomeado)")
+	var semAssinatura []string
+	vistoCaminho := map[string]bool{}
+	for _, p := range processos {
+		if p.Caminho == "" || ehOProprioScanner(p.Caminho, int(p.PID)) {
+			continue
+		}
+		chave := strings.ToLower(p.Caminho)
+		if _, ok := c.AssinaturasDeProcessos[chave]; ok || vistoCaminho[chave] {
+			continue
+		}
+		vistoCaminho[chave] = true
+		semAssinatura = append(semAssinatura, p.Caminho)
+	}
+	if len(semAssinatura) > 0 {
+		r.Progresso("Conferindo a assinatura digital de %d programas antes de ler a memoria", len(semAssinatura))
+		if c.AssinaturasDeProcessos == nil {
+			c.AssinaturasDeProcessos = map[string][2]string{}
+		}
+		for k, v := range assinaturasAuthenticode(semAssinatura) {
+			c.AssinaturasDeProcessos[k] = v
+		}
+	}
+
 	var alvos []Processo
 	for _, p := range processos {
 		if ehOProprioScanner(p.Caminho, int(p.PID)) {
