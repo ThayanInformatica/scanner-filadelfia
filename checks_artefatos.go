@@ -253,4 +253,40 @@ func checarArtefatos(c *Contexto) {
 	checarRelatoriosDeErro(c)
 	r.Progresso("Lendo atalhos e jump lists")
 	checarAtalhosEJumpLists(c)
+	r.Progresso("Lendo o registro de execucao do PCA em disco")
+	checarPCA(c)
+}
+
+func checarPCA(c *Contexto) {
+	r := c.R
+	raiz := filepath.Join(os.Getenv("SystemRoot"), "appcompat", "pca")
+	var execucoes []ExecucaoPCA
+	lidos := 0
+	for _, nome := range []string{"PcaAppLaunchDic.txt", "PcaGeneralDb0.txt", "PcaGeneralDb1.txt"} {
+		dados, err := os.ReadFile(filepath.Join(raiz, nome))
+		if err != nil {
+			continue
+		}
+		lidos++
+		execucoes = append(execucoes, lerPCA(paraUTF8(string(dados)), nome)...)
+	}
+	if lidos == 0 {
+		r.Add(Info, "Registro do PCA em disco nao encontrado", raiz+"\nEsse artefato existe do Windows 11 22H2 em diante e depende do servico PcaSvc estar rodando. Em Windows 10 a ausencia e normal")
+		return
+	}
+	r.Linha("PCA em disco: %d registro(s) de execucao em %d arquivo(s)", len(execucoes), lidos)
+	c.Rastros.PCALido = true
+	c.Rastros.PCAQuantidade = len(execucoes)
+	for _, e := range execucoes {
+		if !e.Hora.IsZero() {
+			c.RegistraExecucao(e.Caminho, e.Hora, "PCA")
+		}
+	}
+	sinais := avaliarPCA(execucoes, c.A, time.Now())
+	for _, s := range sinais {
+		r.Add(s.Severidade, s.Titulo, s.Detalhe)
+	}
+	if len(sinais) == 0 {
+		r.Ok("Nenhum programa com nome de cheat no registro do PCA")
+	}
 }

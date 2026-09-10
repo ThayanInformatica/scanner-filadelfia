@@ -34,17 +34,20 @@ type HandleNoFiveM struct {
 }
 
 type JanelaVista struct {
-	PID          int
-	DonoNome     string
-	DonoCaminho  string
-	Titulo       string
-	Classe       string
-	Largura      int
-	Altura       int
-	Layered      bool
-	Transparente bool
-	Topmost      bool
-	Visivel      bool
+	PID           int
+	DonoNome      string
+	DonoCaminho   string
+	Titulo        string
+	Classe        string
+	X             int
+	Y             int
+	Largura       int
+	Altura        int
+	Layered       bool
+	Transparente  bool
+	Topmost       bool
+	Visivel       bool
+	ForaDaCaptura bool
 }
 
 type Sinal struct {
@@ -309,9 +312,24 @@ func avaliarJanelas(janelas []JanelaVista, larguraTela, alturaTela int, a *Assin
 		if !j.Visivel {
 			continue
 		}
+		conhecido := lowerContains(nome, donosDeOverlayAceitos) || caminhoDoSistema(j.DonoCaminho)
+		if conhecido {
+			continue
+		}
+		local := fmt.Sprintf("Titulo: %q  Classe: %s  %dx%d em (%d,%d)\n%s", j.Titulo, j.Classe, j.Largura, j.Altura, j.X, j.Y, j.DonoCaminho)
 		grande := larguraTela > 0 && alturaTela > 0 && j.Largura >= larguraTela*8/10 && j.Altura >= alturaTela*8/10
-		if j.Layered && j.Transparente && j.Topmost && grande && !lowerContains(nome, donosDeOverlayAceitos) && !caminhoDoSistema(j.DonoCaminho) {
-			sinais = append(sinais, Sinal{Critico, "Janela OVERLAY transparente cobrindo a tela inteira: " + rotulo, fmt.Sprintf("Titulo: %q  Classe: %s  %dx%d\n%s\nJanela invisivel ao clique, sempre no topo e do tamanho da tela e exatamente como ESP externo desenha por cima do jogo", j.Titulo, j.Classe, j.Largura, j.Altura, j.DonoCaminho), "cheat"})
+		sobreposta := j.Layered && j.Transparente
+		switch {
+		case sobreposta && j.Topmost && grande:
+			sinais = append(sinais, Sinal{Critico, "Janela OVERLAY transparente cobrindo a tela inteira: " + rotulo, local + "\nJanela invisivel ao clique, sempre no topo e do tamanho da tela e exatamente como ESP externo desenha por cima do jogo", "cheat"})
+		case sobreposta && miraSobrepostaNaTela(j, larguraTela, alturaTela):
+			sev := Alerta
+			if j.Topmost || j.ForaDaCaptura {
+				sev = Critico
+			}
+			sinais = append(sinais, Sinal{sev, "Janela pequena e transparente parada no centro da tela: " + rotulo, local + "\n" + notaDeMiraSobreposta(j), "cheat"})
+		case j.ForaDaCaptura:
+			sinais = append(sinais, Sinal{Critico, "Janela que se esconde de gravacao e print: " + rotulo, local + "\nEssa janela pediu ao Windows para nao aparecer em captura de tela (WDA_EXCLUDEFROMCAPTURE). Programa serio quase nunca faz isso; overlay de mira faz, e anuncia como recurso, justamente para nao aparecer na telagem", "cheat"})
 		}
 	}
 	return sinais
@@ -401,4 +419,32 @@ func nomeOriginalDiverge(base, original string) bool {
 		return false
 	}
 	return !strings.Contains(a, b) && !strings.Contains(b, a)
+}
+
+func miraSobrepostaNaTela(j JanelaVista, larguraTela, alturaTela int) bool {
+	if larguraTela <= 0 || alturaTela <= 0 || j.Largura <= 0 || j.Altura <= 0 {
+		return false
+	}
+	if j.Largura > 260 || j.Altura > 260 {
+		return false
+	}
+	distancia := func(a, b int) int {
+		if a > b {
+			return a - b
+		}
+		return b - a
+	}
+	return distancia(j.X+j.Largura/2, larguraTela/2) <= larguraTela/20 &&
+		distancia(j.Y+j.Altura/2, alturaTela/2) <= alturaTela/20
+}
+
+func notaDeMiraSobreposta(j JanelaVista) string {
+	nota := "Janela pequena, invisivel ao clique e parada exatamente no centro da tela e o formato de uma mira desenhada por fora do jogo. Miras externas usam janela de 32 a 40 pixels no centro. Isso devolve ao jogador a mira que a cidade esconde quando ele nao esta mirando, e nao aparece em Game Capture do OBS nem no print do servidor"
+	if j.ForaDaCaptura {
+		nota += "\nEsta janela ainda pediu para nao aparecer em captura de tela"
+	}
+	if !j.Topmost {
+		nota += "\nEla nao usa a marca de sempre-no-topo, que e a forma conhecida de escapar de checagem de overlay"
+	}
+	return nota
 }

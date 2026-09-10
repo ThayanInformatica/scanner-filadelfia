@@ -417,6 +417,25 @@ func checarArquivos(c *Contexto) {
 	if len(linhas) > 0 {
 		r.Add(Info, fmt.Sprintf("Executaveis novos/modificados nos ultimos 7 dias em pastas do usuario: %d", len(linhas)), strings.Join(limita(linhas, 200), "\n"))
 	}
+
+	var origens []OrigemDeDownload
+	for _, a := range recentes {
+		if len(origens) >= 200 {
+			break
+		}
+		dados, err := os.ReadFile(a.Caminho + ":Zone.Identifier")
+		if err != nil {
+			continue
+		}
+		host, referencia, zona := lerZoneIdentifier(string(dados))
+		if host == "" && referencia == "" {
+			continue
+		}
+		origens = append(origens, OrigemDeDownload{Arquivo: a.Caminho, Host: host, Referencia: referencia, Zona: zona})
+	}
+	for _, s := range avaliarOrigemDeDownload(origens, c.A) {
+		r.Add(s.Severidade, s.Titulo, s.Detalhe)
+	}
 }
 
 var extensoesInocentes = map[string]bool{

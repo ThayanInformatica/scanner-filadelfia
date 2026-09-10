@@ -299,3 +299,83 @@ func avaliarAutodestruicaoNoJournal(volume string, eventos []EventoUSN, agora ti
 	sort.Strings(linhas)
 	return []Sinal{{Alerta, fmt.Sprintf("%d executavel(is) de nome aleatorio apagados do disco %s nas ultimas 72h", len(linhas), volume), strings.Join(limitaLinhas(linhas, 40), "\n") + "\nLoader de cheat e cleaner de rastro rodam com nome aleatorio e se apagam depois (self destruct). Instalador legitimo tambem cria e apaga temporario, entao confira com o Amcache e o BAM o que esses arquivos eram", "suspeito"}}
 }
+
+type OrigemDeDownload struct {
+	Arquivo    string
+	Host       string
+	Referencia string
+	Zona       string
+}
+
+func lerZoneIdentifier(conteudo string) (host, referencia, zona string) {
+	for _, linha := range strings.Split(conteudo, "\n") {
+		linha = strings.TrimSpace(strings.TrimRight(linha, "\r"))
+		partes := strings.SplitN(linha, "=", 2)
+		if len(partes) != 2 {
+			continue
+		}
+		valor := strings.TrimSpace(partes[1])
+		switch strings.ToLower(strings.TrimSpace(partes[0])) {
+		case "hosturl":
+			host = valor
+		case "referrerurl":
+			referencia = valor
+		case "zoneid":
+			zona = valor
+		}
+	}
+	return host, referencia, zona
+}
+
+func avaliarOrigemDeDownload(origens []OrigemDeDownload, a *Assinaturas) []Sinal {
+	if len(origens) == 0 {
+		return nil
+	}
+	var sinais []Sinal
+	var lista []string
+	vistos := map[string]bool{}
+	for _, o := range origens {
+		endereco := o.Host
+		if endereco == "" {
+			endereco = o.Referencia
+		}
+		if endereco == "" {
+			continue
+		}
+		chave := strings.ToLower(o.Arquivo + endereco)
+		if vistos[chave] {
+			continue
+		}
+		vistos[chave] = true
+		if classe, termo := a.Classificar(endereco); classe != SemMatch {
+			situacao := "suspeito"
+			if classe == ClasseCheat {
+				situacao = "cheat"
+			}
+			sinais = append(sinais, Sinal{classe.Severidade(),
+				fmt.Sprintf("Programa baixado de endereco que bate com '%s': %s", termo, nomeBase(o.Arquivo)),
+				o.Arquivo + "\nBaixado de: " + resumeTexto(endereco, 200) + "\nEsse endereco ficou gravado dentro do proprio arquivo, no fluxo Zone.Identifier. Ele sobrevive a limpeza do historico do navegador", situacao})
+			continue
+		}
+		if termo := a.Dominio(endereco); termo != "" {
+			sinais = append(sinais, Sinal{Alerta,
+				fmt.Sprintf("Programa baixado de site conhecido de cheat ou de venda ('%s'): %s", termo, nomeBase(o.Arquivo)),
+				o.Arquivo + "\nBaixado de: " + resumeTexto(endereco, 200) + "\nEndereco gravado dentro do proprio arquivo, sobrevive a limpeza do historico", "suspeito"})
+			continue
+		}
+		if dominio := ehSiteDeCompartilhamento(endereco); dominio != "" {
+			sinais = append(sinais, Sinal{Alerta,
+				"Programa baixado de site de compartilhamento (" + dominio + "): " + nomeBase(o.Arquivo),
+				o.Arquivo + "\nBaixado de: " + resumeTexto(endereco, 200) + "\nEndereco gravado dentro do proprio arquivo, sobrevive a limpeza do historico", "suspeito"})
+			continue
+		}
+		lista = append(lista, fmt.Sprintf("%s  <- %s", o.Arquivo, resumeTexto(endereco, 160)))
+	}
+	sort.Strings(lista)
+	if len(lista) > 0 {
+		sinais = append(sinais, Sinal{Info,
+			fmt.Sprintf("Origem gravada dentro de %d executavel(is) baixado(s)", len(lista)),
+			strings.Join(limitaLinhas(lista, 60), "\n") + "\nO Windows grava o endereco de download dentro do arquivo. Serve para conferir a origem mesmo com o historico do navegador limpo", ""})
+	}
+	return ordenaSinais(sinais)
+}

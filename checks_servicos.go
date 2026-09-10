@@ -57,6 +57,7 @@ func checarServicos(c *Contexto) {
 	}
 	defer m.Disconnect()
 
+	var conferidos []ServicoConferido
 	for _, esperado := range c.A.Servicos {
 		nome16, _ := windows.UTF16PtrFromString(esperado.Nome)
 		h, err := windows.OpenService(m.Handle, nome16, windows.SERVICE_QUERY_STATUS|windows.SERVICE_QUERY_CONFIG)
@@ -82,6 +83,17 @@ func checarServicos(c *Contexto) {
 		}
 		r.Linha("%-24s %-10s inicio: %-11s %s", esperado.Nome, nomeEstado(status.State), inicio, esperado.Descricao)
 
+		conferido := ServicoConferido{Nome: esperado.Nome, Descricao: esperado.Descricao}
+		conferido.Desativado = errConfig == nil && config.StartType == mgr.StartDisabled
+		conferido.Parado = status.State == svc.Stopped
+		if k, errChave := registry.OpenKey(registry.LOCAL_MACHINE, `SYSTEM\CurrentControlSet\Services\`+esperado.Nome, registry.READ); errChave == nil {
+			if info, errInfo := k.Stat(); errInfo == nil {
+				conferido.Alterado = info.ModTime()
+			}
+			k.Close()
+		}
+		conferidos = append(conferidos, conferido)
+
 		sev := Info
 		switch esperado.Nivel {
 		case "critico":
@@ -102,6 +114,10 @@ func checarServicos(c *Contexto) {
 			}
 			r.Add(sev, "Servico "+esperado.Nome+" esta PARADO", esperado.Descricao)
 		}
+	}
+
+	for _, s := range avaliarAlteracaoEmLoteDeServicos(conferidos) {
+		r.Add(s.Severidade, s.Titulo, s.Detalhe)
 	}
 }
 

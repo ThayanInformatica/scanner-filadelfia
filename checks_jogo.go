@@ -194,6 +194,7 @@ func checarJogo(c *Contexto) {
 				r.Ok("Arquivos do FiveM com assinatura digital do fabricante, nenhum trocado")
 			}
 			checarCitizen(c, app)
+			checarMetadadosDoJogo(c, app)
 		}
 	}
 	if instalacoes == 0 {
@@ -303,5 +304,47 @@ func checarCitizen(c *Contexto, app string) {
 		for _, s := range sinais {
 			r.Add(s.Severidade, s.Titulo, s.Detalhe)
 		}
+	}
+}
+
+func coletarMetadadosDoJogo(app string) MetadadosDoJogo {
+	m := MetadadosDoJogo{Instalacao: app}
+	raiz := filepath.Join(app, "citizen", "common", "data")
+	if !existe(raiz) {
+		return m
+	}
+	filepath.WalkDir(raiz, func(caminho string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() || len(m.Arquivos) >= 60 {
+			return nil
+		}
+		if !strings.EqualFold(filepath.Ext(d.Name()), ".meta") {
+			return nil
+		}
+		a := ArquivoDeMetadados{Nome: d.Name(), Caminho: caminho}
+		if info, err := d.Info(); err == nil {
+			a.Tamanho = info.Size()
+			a.Modificado = info.ModTime()
+			if info.Size() <= 8*1024*1024 {
+				if dados, err := os.ReadFile(caminho); err == nil {
+					a.Valores = lerValoresDeMetadados(string(dados))
+				}
+			}
+		}
+		m.Arquivos = append(m.Arquivos, a)
+		return nil
+	})
+	return m
+}
+
+func checarMetadadosDoJogo(c *Contexto, app string) {
+	r := c.R
+	r.Progresso("Procurando arquivo de configuracao de arma dentro da instalacao do FiveM")
+	m := coletarMetadadosDoJogo(app)
+	sinais := avaliarMetadadosDoJogo(m)
+	for _, s := range sinais {
+		r.Add(s.Severidade, s.Titulo, s.Detalhe)
+	}
+	if len(sinais) == 0 {
+		r.Ok("Nenhum arquivo .meta de arma dentro da instalacao do FiveM (pasta citizen\\common\\data limpa)")
 	}
 }

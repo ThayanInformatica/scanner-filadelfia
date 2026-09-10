@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"time"
 )
 
 type EstadoDoWindows struct {
@@ -132,4 +133,61 @@ func avaliarVirtualizacaoForte(sinaisVM []SinalDeVirtualizacao) []Sinal {
 		return nil
 	}
 	return avaliarVirtualizacao(sinaisVM)
+}
+
+type ServicoConferido struct {
+	Nome       string
+	Descricao  string
+	Alterado   time.Time
+	Desativado bool
+	Parado     bool
+}
+
+func avaliarAlteracaoEmLoteDeServicos(servicos []ServicoConferido) []Sinal {
+	var comHora []ServicoConferido
+	for _, s := range servicos {
+		if !s.Alterado.IsZero() {
+			comHora = append(comHora, s)
+		}
+	}
+	if len(comHora) < 3 {
+		return nil
+	}
+	sort.Slice(comHora, func(i, j int) bool { return comHora[i].Alterado.Before(comHora[j].Alterado) })
+
+	melhorInicio, melhorFim := 0, 0
+	for i := range comHora {
+		j := i
+		for j+1 < len(comHora) && comHora[j+1].Alterado.Sub(comHora[i].Alterado) <= 10*time.Minute {
+			j++
+		}
+		if j-i > melhorFim-melhorInicio {
+			melhorInicio, melhorFim = i, j
+		}
+	}
+	lote := comHora[melhorInicio : melhorFim+1]
+	if len(lote) < 3 {
+		return nil
+	}
+	mexidos := 0
+	var linhas []string
+	for _, s := range lote {
+		estado := "ligado"
+		if s.Desativado {
+			estado = "DESATIVADO"
+			mexidos++
+		} else if s.Parado {
+			estado = "parado"
+			mexidos++
+		}
+		linhas = append(linhas, fmt.Sprintf("%-24s %-11s alterado em %s   (%s)", s.Nome, estado, formataHora(s.Alterado), s.Descricao))
+	}
+	if mexidos == 0 {
+		return nil
+	}
+	janela := lote[len(lote)-1].Alterado.Sub(lote[0].Alterado).Round(time.Second)
+	return []Sinal{{Alerta,
+		fmt.Sprintf("%d servicos de rastreio configurados de uma vez so, em %s", len(lote), janela),
+		strings.Join(linhas, "\n") + "\nPessoa seguindo tutorial mexe em um servico de cada vez, ao longo de dias. Varios alterados dentro da mesma janela de minutos e programa fazendo em lote, tipo painel de otimizacao ou limpador de rastro. Isso nao prova ma intencao sozinho, porque otimizador popular desliga esses mesmos servicos: serve para saber que uma ferramenta rodou, e quando",
+		"suspeito"}}
 }

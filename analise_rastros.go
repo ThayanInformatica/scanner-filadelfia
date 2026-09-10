@@ -19,6 +19,8 @@ type RastrosDeExecucao struct {
 	AmcacheQuantidade           int
 	ShimCacheLido               bool
 	ShimCacheQuantidade         int
+	PCALido                     bool
+	PCAQuantidade               int
 	LimpezasDoSecurity          int
 	LimpezasDeOutrosLogs        int
 	LogSecurityVazio            bool
@@ -83,6 +85,13 @@ func avaliarRastrosDeExecucao(r RastrosDeExecucao, instalacao time.Time, agora t
 			marca(1, "ShimCache vazio", "o AppCompatCache e reescrito no desligamento e so fica vazio com limpeza direta no registro")
 		} else {
 			intactos = append(intactos, fmt.Sprintf("ShimCache (%d executaveis)", r.ShimCacheQuantidade))
+		}
+	}
+	if r.PCALido {
+		if r.PCAQuantidade == 0 {
+			marca(1, "Registro do PCA vazio", "o PcaSvc grava em C:\\Windows\\appcompat\\pca o caminho de todo programa com janela que abriu; vazio e servico desligado ou arquivo apagado")
+		} else {
+			intactos = append(intactos, fmt.Sprintf("PCA em disco (%d execucoes)", r.PCAQuantidade))
 		}
 	}
 	if r.LimpezasDoSecurity > 0 {

@@ -390,6 +390,7 @@ var (
 	procGetWindowRect            = user32.NewProc("GetWindowRect")
 	procGetWindowThreadProcessId = user32.NewProc("GetWindowThreadProcessId")
 	procIsWindowVisible          = user32.NewProc("IsWindowVisible")
+	procGetWindowDisplayAffinity = user32.NewProc("GetWindowDisplayAffinity")
 	procGetSystemMetrics         = user32.NewProc("GetSystemMetrics")
 	procEnumProcesses            = psapi.NewProc("EnumProcesses")
 )
@@ -571,6 +572,8 @@ func handlesAbertosNoProcesso(alvo uint32) ([]HandleNoFiveM, error) {
 	return achados, nil
 }
 
+const wdaExcludeFromCapture = 0x11
+
 type retangulo struct{ Esq, Topo, Dir, Base int32 }
 
 func janelasAbertas() []JanelaVista {
@@ -586,10 +589,13 @@ func janelasAbertas() []JanelaVista {
 		var r retangulo
 		procGetWindowRect.Call(hwnd, uintptr(unsafe.Pointer(&r)))
 		visivel, _, _ := procIsWindowVisible.Call(hwnd)
+		var afinidade uint32
+		procGetWindowDisplayAffinity.Call(hwnd, uintptr(unsafe.Pointer(&afinidade)))
 		lista = append(lista, JanelaVista{
 			PID: int(pid), Titulo: windows.UTF16ToString(titulo[:n]), Classe: windows.UTF16ToString(classe[:m]),
-			Largura: int(r.Dir - r.Esq), Altura: int(r.Base - r.Topo),
+			X: int(r.Esq), Y: int(r.Topo), Largura: int(r.Dir - r.Esq), Altura: int(r.Base - r.Topo),
 			Layered: estilo&0x80000 != 0, Transparente: estilo&0x20 != 0, Topmost: estilo&0x8 != 0, Visivel: visivel != 0,
+			ForaDaCaptura: afinidade == wdaExcludeFromCapture,
 		})
 		return 1
 	})

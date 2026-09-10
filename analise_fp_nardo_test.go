@@ -186,3 +186,73 @@ func TestDataSoltaNaCitizenInstalada(t *testing.T) {
 		t.Fatal("datas todas espalhadas nao acusa ninguem")
 	}
 }
+
+func janelaDeTeste(nome string, x, y, w, h int) JanelaVista {
+	return JanelaVista{PID: 4242, DonoNome: nome, DonoCaminho: `C:\Users\Nardo\Desktop\` + nome, Classe: "Qt5152QWindowIcon", Visivel: true, X: x, Y: y, Largura: w, Altura: h}
+}
+
+func TestMiraSobrepostaPequenaEhAcusada(t *testing.T) {
+	a := assinaturasDeTeste(t)
+	const lt, at = 2560, 1080
+	j := janelaDeTeste("precision v3.exe", lt/2-20, at/2-20, 40, 40)
+	j.Layered, j.Transparente, j.Topmost = true, true, true
+	s := avaliarJanelas([]JanelaVista{j}, lt, at, a)
+	if len(s) != 1 || s[0].Severidade != Critico || !strings.Contains(s[0].Titulo, "centro da tela") {
+		t.Fatalf("mira de 40px no centro tem que ser critica: %+v", s)
+	}
+	if !strings.Contains(s[0].Detalhe, "Game Capture") {
+		t.Fatalf("tem que avisar que nao aparece na gravacao: %s", s[0].Detalhe)
+	}
+
+	semTopo := j
+	semTopo.Topmost = false
+	s = avaliarJanelas([]JanelaVista{semTopo}, lt, at, a)
+	if len(s) != 1 || s[0].Severidade != Alerta || !strings.Contains(s[0].Detalhe, "escapar de checagem") {
+		t.Fatalf("sem sempre-no-topo vira alerta e explica a evasao: %+v", s)
+	}
+}
+
+func TestJanelaPequenaForaDoCentroNaoEhMira(t *testing.T) {
+	a := assinaturasDeTeste(t)
+	j := janelaDeTeste("widget.exe", 40, 40, 40, 40)
+	j.Layered, j.Transparente, j.Topmost = true, true, true
+	if s := avaliarJanelas([]JanelaVista{j}, 2560, 1080, a); len(s) != 0 {
+		t.Fatalf("janela no canto nao e mira: %+v", s)
+	}
+	grande := janelaDeTeste("widget.exe", 1180, 440, 200, 200)
+	grande.Layered, grande.Transparente = true, true
+	if s := avaliarJanelas([]JanelaVista{grande}, 2560, 1080, a); len(s) != 1 {
+		t.Fatalf("200px centralizada ainda conta como mira: %+v", s)
+	}
+}
+
+func TestOverlayFullscreenContinuaCritico(t *testing.T) {
+	a := assinaturasDeTeste(t)
+	j := janelaDeTeste("esp.exe", 0, 0, 2560, 1080)
+	j.Layered, j.Transparente, j.Topmost = true, true, true
+	s := avaliarJanelas([]JanelaVista{j}, 2560, 1080, a)
+	if len(s) != 1 || s[0].Severidade != Critico || !strings.Contains(s[0].Titulo, "tela inteira") {
+		t.Fatalf("ESP fullscreen nao pode ter regredido: %+v", s)
+	}
+}
+
+func TestJanelaQueSeEscondeDeCapturaEhCritica(t *testing.T) {
+	a := assinaturasDeTeste(t)
+	j := janelaDeTeste("mira.exe", 800, 300, 500, 500)
+	j.ForaDaCaptura = true
+	s := avaliarJanelas([]JanelaVista{j}, 2560, 1080, a)
+	if len(s) != 1 || s[0].Severidade != Critico || !strings.Contains(s[0].Titulo, "esconde de gravacao") {
+		t.Fatalf("janela excluida de captura e critica: %+v", s)
+	}
+}
+
+func TestOverlayDeDonoConhecidoNaoAcusa(t *testing.T) {
+	a := assinaturasDeTeste(t)
+	for _, dono := range []string{"Discord.exe", "obs64.exe", "Medal.exe", "RadeonSoftware.exe"} {
+		j := janelaDeTeste(dono, 1260, 520, 40, 40)
+		j.Layered, j.Transparente, j.Topmost, j.ForaDaCaptura = true, true, true, true
+		if s := avaliarJanelas([]JanelaVista{j}, 2560, 1080, a); len(s) != 0 {
+			t.Fatalf("%s e overlay legitimo: %+v", dono, s)
+		}
+	}
+}

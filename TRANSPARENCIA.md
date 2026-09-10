@@ -22,15 +22,27 @@ e la que a checagem mora.
 **Sistema e configuracao** (`checks_sistema.go`, `checks_servicos.go`, `checks_registro.go`)
 Versao e build do Windows, integridade de codigo, modo de teste de assinatura, servicos do
 Windows e se foram parados, politicas do Defender, chaves de inicializacao automatica,
-tarefas agendadas.
+tarefas agendadas. Le tambem a data da ultima alteracao da chave de cada servico, para
+distinguir varios servicos desligados de uma vez por um programa de ajustes feitos a mao ao
+longo do tempo.
 
 **Rastros de execucao** (`checks_logs.go`, `checks_etw.go`, `checks_artefatos.go`, `checks_arquivos.go`)
 Logs de eventos do Windows, sessoes de rastreamento do kernel, Prefetch, ShimCache, relatorios
-de falha, atalhos e listas de arquivos recentes, nomes de arquivos nos discos fixos.
+de falha, atalhos e listas de arquivos recentes, nomes de arquivos nos discos fixos. Le tambem
+os arquivos de texto do Assistente de Compatibilidade em `C:\Windows\appcompat\pca`, que
+guardam o caminho e a hora de cada programa com janela que foi aberto.
+
+Nos executaveis recentes das pastas do usuario le o fluxo alternativo `Zone.Identifier`, que o
+proprio Windows grava dentro do arquivo baixado e que contem o endereco de origem do download.
+Le so esse fluxo, so em executavel, e so o endereco.
 
 **Processos e memoria** (`checks_processos.go`, `checks_memoria.go`)
 Lista de processos com caminho, processo pai e assinatura digital, modulos carregados,
 janelas abertas, handles abertos no FiveM, e regioes de memoria executaveis do proprio FiveM.
+
+De cada janela le tamanho, posicao, estilo e se ela pediu ao Windows para nao aparecer em
+captura de tela. Serve para achar mira e ESP desenhados por cima do jogo. Nao le o conteudo
+de nenhuma janela.
 
 No processo do jogo a leitura e mais funda: alem das regioes de codigo, le tambem a memoria de
 dados, porque executor de Lua manda o script para dentro do jogo e o texto fica ali; confere se
@@ -46,11 +58,15 @@ qualquer pagina ou conversa aberta, e isso nao diz nada sobre cheat. A leitura e
 memoria e descartada: nenhum trecho e gravado alem do pedaco de texto em volta de um nome
 de cheat, quando existe.
 
-**Integridade do jogo** (`checks_jogo.go`)
+**Integridade do jogo** (`checks_jogo.go`, `analise_meta.go`)
 Assinatura digital dos arquivos do FiveM e do GTA V, e a pasta `citizen` do FiveM: a data dos
 arquivos-chave dela (o atualizador grava todos na mesma leva) e, se existir uma copia solta da
 `citizen` em Downloads, Desktop, Documentos ou Temp, o hash de dez arquivos dela comparado com
 os instalados. Nao le o conteudo dos arquivos alem de calcular o hash.
+
+Le tambem os arquivos `.meta` que estejam em `citizen\common\data` dentro da instalacao do
+FiveM, e compara os valores de recuo e dispersao com o padrao do jogo. Uma instalacao limpa nao
+tem nenhum arquivo `.meta` nessa pasta. Le so numero de configuracao de arma, nada mais.
 
 **Historico de execucao com hash** (`checks_amcache.go`)
 Le o Amcache.hve, o registro que o Windows mantem de todo programa que ja executou, com o
