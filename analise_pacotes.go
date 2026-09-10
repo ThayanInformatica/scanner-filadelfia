@@ -97,6 +97,15 @@ func avaliarPacote(p PacoteAnalisado, a *Assinaturas) []Sinal {
 	}
 
 	sort.Strings(perigosos)
+	if len(perigosos) > 0 && pacoteDoProprioScanner(p.Itens) {
+		return []Sinal{{Info, fmt.Sprintf("%s e o pacote do proprio Scanner Filadelfia", nomeBase(p.Caminho)), p.Caminho + "\n" + strings.Join(limitaLinhas(perigosos, 10), "\n") + "\nscanner.exe, verificar.exe e os scripts de teste sao deste kit, nao do jogador", ""}}
+	}
+	if len(perigosos) > 0 {
+		if temCitizen, estranhos := pastaCitizenNoPacote(p.Itens); temCitizen {
+			sinais = append(sinais, sinalDePacoteComCitizen(p, perigosos, estranhos))
+			perigosos = nil
+		}
+	}
 	doJogo := arquivoDoUniversoDoJogo(nomeBase(p.Caminho)) != ""
 	if len(perigosos) > 0 && soManifestoDeRecurso(p.Itens) {
 		sinais = append(sinais, Sinal{Info, fmt.Sprintf("%s e um recurso de servidor FiveM (so tem fxmanifest.lua de script)", nomeBase(p.Caminho)), p.Caminho + "\n" + strings.Join(limitaLinhas(perigosos, 20), "\n") + "\nfxmanifest.lua e o arquivo de descricao de recurso de servidor, nao e programa. Pacote de mod de carro, mapa ou roupa vem assim", ""})
@@ -340,4 +349,86 @@ func formataTamanho(bytes int64) string {
 		return fmt.Sprintf("%d KB", bytes/1024)
 	}
 	return fmt.Sprintf("%.1f MB", float64(bytes)/1024/1024)
+}
+
+func pacoteDoProprioScanner(itens []ItemDePacote) bool {
+	temScanner, temKit := false, false
+	for _, item := range itens {
+		base := strings.ToLower(nomeBase(item.Nome))
+		switch base {
+		case "scanner.exe":
+			temScanner = true
+		case "transparencia.md", "plantar.ps1", "verificar.exe", "so-para-a-equipe.txt", "assinaturas.exemplo.json":
+			temKit = true
+		}
+	}
+	return temScanner && temKit
+}
+
+var pastasDaEstruturaCitizen = []string{"clr2/", "scripting/", "shaderz/", "dui/", "ui/", "common/", "platform/", "ros/", "plugins/"}
+
+func pastaCitizenNoPacote(itens []ItemDePacote) (bool, []string) {
+	temCitizen := false
+	for _, item := range itens {
+		nome := strings.ToLower(strings.ReplaceAll(item.Nome, `\`, "/"))
+		if strings.Contains(nome, "clr2/lib/mono") || strings.HasSuffix(nome, "/citizenfx.core.dll") || nome == "citizenfx.core.dll" {
+			temCitizen = true
+			break
+		}
+	}
+	if !temCitizen {
+		return false, nil
+	}
+	var estranhos []string
+	for _, item := range itens {
+		nome := strings.ToLower(strings.ReplaceAll(item.Nome, `\`, "/"))
+		base := nomeBase(item.Nome)
+		if extensoesPerigosasEmPacote[strings.ToLower(path.Ext(base))] == "" {
+			continue
+		}
+		if dentroDaEstruturaCitizen(nome) {
+			continue
+		}
+		estranhos = append(estranhos, item.Nome)
+	}
+	sort.Strings(estranhos)
+	return true, estranhos
+}
+
+func dentroDaEstruturaCitizen(nome string) bool {
+	for _, pasta := range pastasDaEstruturaCitizen {
+		if strings.HasPrefix(nome, pasta) || strings.Contains(nome, "/"+pasta) {
+			return true
+		}
+	}
+	return false
+}
+
+func extensaoComCaixaTrocada(nome string) bool {
+	ext := path.Ext(strings.ReplaceAll(nome, `\`, "/"))
+	if len(ext) < 3 {
+		return false
+	}
+	letras := ext[1:]
+	return letras != strings.ToLower(letras) && letras != strings.ToUpper(letras)
+}
+
+func sinalDePacoteComCitizen(p PacoteAnalisado, perigosos, estranhos []string) Sinal {
+	base := nomeBase(p.Caminho)
+	if len(estranhos) == 0 {
+		return Sinal{Alerta, fmt.Sprintf("%s e uma copia da pasta 'citizen' do FiveM (troca de citizen)", base),
+			p.Caminho + "\n" + strings.Join(limitaLinhas(perigosos, 30), "\n") +
+				"\nA pasta 'citizen' e o coracao do FiveM (CitizenFX.Core.dll, Mono, scripting). Ela nao se baixa avulsa: vem pelo instalador oficial. Pacote de 'citizen' passado por Drive, MediaFire ou Discord e o jeito mais comum de trocar a CitizenFX.Core.dll por versao com executor de script, e tambem o jeito comum de pacote de otimizacao de FPS. A etapa Integridade do jogo compara a citizen instalada com esta copia", "suspeito"}
+	}
+	var linhas []string
+	for _, e := range estranhos {
+		linha := e
+		if extensaoComCaixaTrocada(e) {
+			linha += "  (extensao com letras trocadas, jeito de passar por filtro)"
+		}
+		linhas = append(linhas, linha)
+	}
+	return Sinal{Critico, fmt.Sprintf("%s traz a pasta 'citizen' do FiveM junto com %d arquivo(s) que nao pertencem a ela", base, len(estranhos)),
+		p.Caminho + "\nFora da estrutura da citizen:\n  " + strings.Join(limitaLinhas(linhas, 20), "\n  ") + "\nDa citizen:\n  " + strings.Join(limitaLinhas(perigosos, 20), "\n  ") +
+			"\nPacote com a pasta 'citizen' do FiveM mais script ou dll solto ao lado e a entrega classica de executor: a citizen trocada carrega o script. Abra o pacote e leia o que e cada arquivo solto", "cheat"}
 }

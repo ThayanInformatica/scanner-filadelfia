@@ -67,7 +67,7 @@ func TestHookParaMemoriaPrivadaEhCritico(t *testing.T) {
 		if strings.Contains(x.Titulo, "kernel32.dll") && x.Severidade == Alerta {
 			achouAlerta = true
 		}
-		if strings.Contains(x.Titulo, "dxgi.dll") && x.Severidade == Info {
+		if strings.Contains(x.Titulo, "ReShade") && strings.Contains(x.Detalhe, "dxgi.dll") && x.Severidade == Info {
 			achouInfo = true
 		}
 	}

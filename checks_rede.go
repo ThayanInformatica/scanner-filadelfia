@@ -5,6 +5,7 @@ package main
 import (
 	"fmt"
 	"net"
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -65,7 +66,11 @@ func checarRede(c *Contexto) {
 		}
 		m := reHex64.FindStringSubmatch(saida)
 		if m == nil {
-			r.Add(Alerta, "Unidade "+letra+" sem journal USN ativo", "fsutil usn deletejournal apaga o historico de arquivos criados/apagados. Resposta: "+resume(saida, 200))
+			nota := "fsutil usn deletejournal apaga o historico de arquivos criados/apagados. "
+			if !strings.EqualFold(strings.TrimSuffix(letra, ":"), strings.TrimSuffix(os.Getenv("SystemDrive"), ":")) {
+				nota = "Em disco de dados o journal so existe se o Windows Search ou algum programa criou; pode nunca ter existido. Mas fsutil usn deletejournal e o jeito de apagar o historico de arquivos criados/apagados, e o disco de jogos e onde o cheat costuma ficar. "
+			}
+			r.Add(Alerta, "Unidade "+letra+" sem journal USN ativo", nota+"Resposta: "+resume(saida, 200))
 			continue
 		}
 		id, _ := strconv.ParseUint(m[1], 16, 64)

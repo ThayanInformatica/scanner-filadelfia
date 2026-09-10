@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -192,6 +193,7 @@ func checarJogo(c *Contexto) {
 			if len(sinais) == 0 {
 				r.Ok("Arquivos do FiveM com assinatura digital do fabricante, nenhum trocado")
 			}
+			checarCitizen(c, app)
 		}
 	}
 	if instalacoes == 0 {
@@ -214,6 +216,92 @@ func checarJogo(c *Contexto) {
 		}
 		if len(sinais) == 0 {
 			r.Ok("Nenhum plugin .asi nem dll de carregamento de mod na pasta do GTA V")
+		}
+	}
+}
+
+func arquivosDaCitizen(raiz string) []ArquivoDaCitizen {
+	var lista []ArquivoDaCitizen
+	for _, rel := range arquivosChaveDaCitizen {
+		caminho := filepath.Join(raiz, rel)
+		a := ArquivoDaCitizen{Relativo: rel}
+		if info, err := os.Stat(caminho); err == nil && !info.IsDir() {
+			a.Existe = true
+			a.Modificado = info.ModTime().Truncate(time.Second)
+			a.Hash = sha256DoArquivo(caminho, 64*1024*1024)
+		}
+		lista = append(lista, a)
+	}
+	return lista
+}
+
+func pastasCitizenSoltas(c *Contexto, instalacao string) []string {
+	var raizes []string
+	vistos := map[string]bool{}
+	appLower := strings.ToLower(instalacao)
+	for _, p := range c.Perfis {
+		for _, sub := range []string{"Desktop", "Downloads", "Documents", "Videos", filepath.Join("AppData", "Local", "Temp")} {
+			base := filepath.Join(p.Pasta, sub)
+			if !existe(base) {
+				continue
+			}
+			profundidadeBase := strings.Count(base, string(os.PathSeparator))
+			filepath.WalkDir(base, func(caminho string, d fs.DirEntry, err error) error {
+				if err != nil {
+					return nil
+				}
+				if d.IsDir() {
+					if strings.Count(caminho, string(os.PathSeparator))-profundidadeBase >= 7 || strings.Contains(strings.ToLower(caminho), "fivem.app") {
+						return filepath.SkipDir
+					}
+					return nil
+				}
+				if !strings.EqualFold(d.Name(), "CitizenFX.Core.dll") {
+					return nil
+				}
+				lower := strings.ToLower(caminho)
+				if !strings.Contains(lower, `\clr2\lib\mono\4.5\citizenfx.core.dll`) || strings.HasPrefix(lower, appLower) {
+					return nil
+				}
+				raiz := caminho
+				for i := 0; i < 5; i++ {
+					raiz = filepath.Dir(raiz)
+				}
+				if !vistos[strings.ToLower(raiz)] {
+					vistos[strings.ToLower(raiz)] = true
+					raizes = append(raizes, raiz)
+				}
+				return nil
+			})
+		}
+	}
+	sort.Strings(raizes)
+	return raizes
+}
+
+func checarCitizen(c *Contexto, app string) {
+	r := c.R
+	instalada := filepath.Join(app, "citizen")
+	if !existe(instalada) {
+		return
+	}
+	r.Progresso("Conferindo a pasta citizen instalada e procurando copias soltas dela")
+	arquivosInstalados := arquivosDaCitizen(instalada)
+	for _, s := range avaliarDatasDaCitizenInstalada(arquivosInstalados, instalada) {
+		r.Add(s.Severidade, s.Titulo, s.Detalhe)
+	}
+	soltas := pastasCitizenSoltas(c, app)
+	if len(soltas) == 0 {
+		r.Ok("Nenhuma copia solta da pasta citizen do FiveM fora da instalacao")
+		return
+	}
+	for _, raiz := range soltas {
+		if c.DevePular() {
+			return
+		}
+		sinais := avaliarCitizenSolta(CitizenSolta{Raiz: raiz, Arquivos: arquivosDaCitizen(raiz), Instalada: arquivosInstalados}, instalada)
+		for _, s := range sinais {
+			r.Add(s.Severidade, s.Titulo, s.Detalhe)
 		}
 	}
 }

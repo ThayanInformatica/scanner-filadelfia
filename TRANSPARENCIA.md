@@ -46,6 +46,12 @@ qualquer pagina ou conversa aberta, e isso nao diz nada sobre cheat. A leitura e
 memoria e descartada: nenhum trecho e gravado alem do pedaco de texto em volta de um nome
 de cheat, quando existe.
 
+**Integridade do jogo** (`checks_jogo.go`)
+Assinatura digital dos arquivos do FiveM e do GTA V, e a pasta `citizen` do FiveM: a data dos
+arquivos-chave dela (o atualizador grava todos na mesma leva) e, se existir uma copia solta da
+`citizen` em Downloads, Desktop, Documentos ou Temp, o hash de dez arquivos dela comparado com
+os instalados. Nao le o conteudo dos arquivos alem de calcular o hash.
+
 **Historico de execucao com hash** (`checks_amcache.go`)
 Le o Amcache.hve, o registro que o Windows mantem de todo programa que ja executou, com o
 hash SHA1 de cada um. Serve para achar loader que rodou e foi apagado, e para bater hash de
@@ -106,6 +112,11 @@ conteudo de conversa.
 
 Ele nao altera configuracao do Windows, nao mexe no Defender, nao apaga nada seu e nao
 instala driver.
+
+Existe um modo opcional, desligado por padrao, ligado so com `-autodestruir`: ao fechar,
+o scanner apaga o proprio `.exe` e o `assinaturas.json` que estiver ao lado dele, usando
+um `.bat` temporario. O relatorio e mantido, e nenhum outro arquivo seu e tocado. Sem esse
+argumento, o scanner nunca se apaga.
 
 ## O que ele nao faz, e da para conferir
 

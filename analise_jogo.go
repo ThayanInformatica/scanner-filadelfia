@@ -187,3 +187,116 @@ func avaliarVirtualizacao(sinaisVM []SinalDeVirtualizacao) []Sinal {
 	sort.Strings(linhas)
 	return []Sinal{{Critico, "Este Windows esta rodando dentro de uma MAQUINA VIRTUAL", strings.Join(linhas, "\n") + "\nTelagem feita dentro de maquina virtual nao vale: o jogador pode estar mostrando um sistema limpo enquanto joga no Windows real da maquina. Peca para rodar o scanner no Windows onde o FiveM abre", "cheat"}}
 }
+
+type ArquivoDaCitizen struct {
+	Relativo   string
+	Hash       string
+	Modificado time.Time
+	Existe     bool
+}
+
+type CitizenSolta struct {
+	Raiz      string
+	Arquivos  []ArquivoDaCitizen
+	Instalada []ArquivoDaCitizen
+}
+
+var arquivosChaveDaCitizen = []string{
+	`clr2\lib\mono\4.5\CitizenFX.Core.dll`,
+	`clr2\lib\mono\4.5\CitizenFX.Core.Client.dll`,
+	`clr2\lib\mono\4.5\v2\CitizenFX.Core.dll`,
+	`clr2\lib\mono\4.5\v2\CitizenFX.FiveM.dll`,
+	`clr2\lib\mono\4.5\v2\CitizenFX.FiveM.NativeImpl.dll`,
+	`clr2\lib\mono\4.5\v2\Native\CitizenFX.FiveM.Native.dll`,
+	`clr2\lib\mono\4.5\mscorlib.dll`,
+	`scripting\lua\scheduler.lua`,
+	`scripting\lua\natives_loader.lua`,
+	`scripting\v8\main.js`,
+}
+
+func avaliarCitizenSolta(c CitizenSolta, instalacao string) []Sinal {
+	instalada := map[string]ArquivoDaCitizen{}
+	for _, a := range c.Instalada {
+		instalada[strings.ToLower(a.Relativo)] = a
+	}
+	var iguais, diferentes, soNaCopia []string
+	iguaisComMesmaData := 0
+	for _, a := range c.Arquivos {
+		if !a.Existe {
+			continue
+		}
+		i, ok := instalada[strings.ToLower(a.Relativo)]
+		linha := fmt.Sprintf("%s  copia: %s  instalado: %s", a.Relativo, formataHora(a.Modificado), formataHora(i.Modificado))
+		switch {
+		case !ok || !i.Existe:
+			soNaCopia = append(soNaCopia, a.Relativo)
+		case a.Hash != "" && a.Hash == i.Hash:
+			iguais = append(iguais, linha)
+			if !a.Modificado.IsZero() && a.Modificado.Equal(i.Modificado) {
+				iguaisComMesmaData++
+			}
+		default:
+			diferentes = append(diferentes, linha)
+		}
+	}
+	if len(iguais)+len(diferentes)+len(soNaCopia) == 0 {
+		return nil
+	}
+	cabecalho := c.Raiz + "\nComparacao com a citizen instalada em " + instalacao
+	if len(diferentes) == 0 && len(iguais) > 0 {
+		sev := Alerta
+		nota := "\nTodos os arquivos-chave da copia solta sao identicos aos instalados. Ou a copia veio da propria instalacao (backup), ou a instalacao foi trocada por esta copia. "
+		if iguaisComMesmaData > 0 {
+			sev = Critico
+			nota += fmt.Sprintf("%d arquivo(s) instalado(s) tem exatamente a mesma data da copia solta, e o instalador do FiveM grava os arquivos dele com a data da atualizacao, nao com a data de um pacote de terceiro: a citizen instalada FOI TROCADA por esta copia. ", iguaisComMesmaData)
+		}
+		nota += "Pergunte de onde veio a pasta e confira a origem no historico do navegador"
+		return []Sinal{{sev, fmt.Sprintf("Pasta 'citizen' do FiveM solta em %s, identica a instalada", nomeBase(c.Raiz)), cabecalho + "\n" + strings.Join(limitaLinhas(iguais, 12), "\n") + nota, "suspeito"}}
+	}
+	detalhe := cabecalho
+	if len(diferentes) > 0 {
+		detalhe += "\nDIFERENTES do instalado:\n  " + strings.Join(limitaLinhas(diferentes, 12), "\n  ")
+	}
+	if len(iguais) > 0 {
+		detalhe += "\nIguais ao instalado:\n  " + strings.Join(limitaLinhas(iguais, 12), "\n  ")
+	}
+	if len(soNaCopia) > 0 {
+		detalhe += "\nSo existem na copia:\n  " + strings.Join(limitaLinhas(soNaCopia, 12), "\n  ")
+	}
+	sev := Alerta
+	if len(diferentes) > 0 {
+		sev = Critico
+	}
+	return []Sinal{{sev, fmt.Sprintf("Pasta 'citizen' do FiveM solta em %s, com %d arquivo(s) diferente(s) da instalada", nomeBase(c.Raiz), len(diferentes)), detalhe + "\nUma citizen modificada e o jeito de embutir executor de script no proprio FiveM. Se a instalada esta integra hoje, o FiveM pode ter restaurado os arquivos na ultima atualizacao; a copia solta continua sendo o pacote que o jogador baixou. Abra a CitizenFX.Core.dll da copia e compare com a oficial", "cheat"}}
+}
+
+func avaliarDatasDaCitizenInstalada(arquivos []ArquivoDaCitizen, instalacao string) []Sinal {
+	var datas []time.Time
+	for _, a := range arquivos {
+		if a.Existe && !a.Modificado.IsZero() {
+			datas = append(datas, a.Modificado)
+		}
+	}
+	if len(datas) < 4 {
+		return nil
+	}
+	sort.Slice(datas, func(i, j int) bool { return datas[i].Before(datas[j]) })
+	mediana := datas[len(datas)/2]
+	var fora []string
+	for _, a := range arquivos {
+		if !a.Existe || a.Modificado.IsZero() {
+			continue
+		}
+		diferenca := a.Modificado.Sub(mediana)
+		if diferenca < 0 {
+			diferenca = -diferenca
+		}
+		if diferenca > 36*time.Hour {
+			fora = append(fora, fmt.Sprintf("%s  %s (os demais: %s)", a.Relativo, formataHora(a.Modificado), formataHora(mediana)))
+		}
+	}
+	if len(fora) == 0 || len(fora)*2 > len(datas) {
+		return nil
+	}
+	return []Sinal{{Critico, fmt.Sprintf("%d arquivo(s) da citizen instalada com data diferente dos vizinhos", len(fora)), instalacao + "\n" + strings.Join(fora, "\n") + "\nO atualizador do FiveM grava todos os arquivos da citizen na mesma leva, entao eles tem a mesma data. Um arquivo com data solta foi copiado por cima na mao, que e como se troca a CitizenFX.Core.dll por versao com executor", "cheat"}}
+}

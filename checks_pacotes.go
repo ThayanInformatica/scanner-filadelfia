@@ -97,7 +97,7 @@ func pacoteInteressa(c *Contexto, caminho string, info fs.FileInfo) bool {
 	if ehPacote(nome) == "" {
 		return false
 	}
-	if arquivoDoProprioJogo(caminho) || pacoteDeDriverOuInstalador(caminho) {
+	if arquivoDoProprioJogo(caminho) || pacoteDeDriverOuInstalador(caminho) || conteudoInternoDaCitizen(nome) {
 		return false
 	}
 	if c.A.Marca(nome) != "" || arquivoDoUniversoDoJogo(nome) != "" {

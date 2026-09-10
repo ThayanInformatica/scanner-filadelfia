@@ -287,17 +287,94 @@ func avaliarThreadsDoJogo(threads []ThreadAnalisada, processo string) []Sinal {
 }
 
 type HookDetectado struct {
-	Modulo          string
-	Deslocamento    uint64
-	Endereco        uint64
-	Destino         uint64
-	ModuloDoDestino string
-	TipoDoDestino   string
-	BytesEmMemoria  string
-	BytesNoDisco    string
+	Modulo           string
+	Deslocamento     uint64
+	Endereco         uint64
+	Destino          uint64
+	DestinoFinal     uint64
+	Saltos           int
+	ModuloDoDestino  string
+	CaminhoDoDestino string
+	TipoDoDestino    string
+	BytesEmMemoria   string
+	BytesNoDisco     string
 }
 
 var modulosQueRecebemHookLegitimo = []string{"d3d11.dll", "dxgi.dll", "d3d12.dll", "d3d9.dll", "opengl32.dll", "gdi32.dll", "gdi32full.dll"}
+
+var donosConhecidosDeHook = map[string]string{
+	"chrome_elf.dll":            "navegador embutido (CEF) do FiveM",
+	"libcef.dll":                "navegador embutido (CEF) do FiveM",
+	"gameoverlayrenderer64.dll": "overlay da Steam",
+	"gameoverlayrenderer.dll":   "overlay da Steam",
+	"discordhook64.dll":         "overlay do Discord",
+	"discordhook.dll":           "overlay do Discord",
+	"graphics-hook64.dll":       "captura de video (OBS, Medal, Streamlabs)",
+	"graphics-hook32.dll":       "captura de video (OBS, Medal, Streamlabs)",
+	"rtsshooks64.dll":           "RivaTuner / MSI Afterburner",
+	"reshade64.dll":             "ReShade",
+	"nvspcap64.dll":             "NVIDIA ShadowPlay",
+	"amdow.dll":                 "overlay da AMD",
+	"atieah64.exe":              "overlay da AMD",
+	"easyhook64.dll":            "EasyHook (usado por overlays e gravadores)",
+}
+
+func donoDoHook(h HookDetectado) (string, bool) {
+	if h.ModuloDoDestino == "" {
+		return "", false
+	}
+	if caminho := strings.ToLower(strings.ReplaceAll(h.CaminhoDoDestino, "/", `\`)); strings.Contains(caminho, `\fivem.app\`) || strings.Contains(caminho, `\fivem\`) {
+		return "o proprio FiveM", true
+	}
+	if descricao, ok := donosConhecidosDeHook[strings.ToLower(h.ModuloDoDestino)]; ok {
+		return descricao, true
+	}
+	return "", false
+}
+
+func seguirDesvios(codigo []byte, endereco uint64, ler func(uint64, int) []byte, maxSaltos int) (uint64, int) {
+	destino, ok := resolverDesvio(codigo, endereco, ler)
+	if !ok {
+		return 0, 0
+	}
+	saltos := 0
+	for saltos < maxSaltos && destino != 0 {
+		proximo := ler(destino, 16)
+		if len(proximo) < 5 {
+			break
+		}
+		seguinte, ok := resolverDesvio(proximo, destino, ler)
+		if !ok || seguinte == 0 || seguinte == destino {
+			break
+		}
+		destino = seguinte
+		saltos++
+	}
+	return destino, saltos
+}
+
+func resolverDesvio(codigo []byte, endereco uint64, ler func(uint64, int) []byte) (uint64, bool) {
+	if len(codigo) >= 6 && codigo[0] == 0xFF && codigo[1] == 0x25 {
+		desloc := int32(uint32(codigo[2]) | uint32(codigo[3])<<8 | uint32(codigo[4])<<16 | uint32(codigo[5])<<24)
+		ponteiro := uint64(int64(endereco) + 6 + int64(desloc))
+		if desloc == 0 && len(codigo) >= 14 {
+			return leUint64(codigo[6:14]), true
+		}
+		if dados := ler(ponteiro, 8); len(dados) == 8 {
+			return leUint64(dados), true
+		}
+		return 0, true
+	}
+	return destinoDoDesvio(codigo, endereco)
+}
+
+func leUint64(b []byte) uint64 {
+	var v uint64
+	for i := 0; i < 8 && i < len(b); i++ {
+		v |= uint64(b[i]) << (8 * i)
+	}
+	return v
+}
 
 func hookLegitimoConhecido(modulo string) bool {
 	lower := strings.ToLower(modulo)
@@ -315,9 +392,13 @@ func avaliarHooks(hooks []HookDetectado, processo string) []Sinal {
 	}
 	var paraPrivada []string
 	porModulo := map[string][]string{}
-	var ordem []string
+	porDono := map[string][]string{}
+	var ordem, ordemDonos []string
 	for _, h := range hooks {
 		linha := fmt.Sprintf("%s+0x%X (0x%X) desvia para 0x%X", h.Modulo, h.Deslocamento, h.Endereco, h.Destino)
+		if h.Saltos > 0 && h.DestinoFinal != 0 && h.DestinoFinal != h.Destino {
+			linha += fmt.Sprintf(", que e um trampolim e segue ate 0x%X", h.DestinoFinal)
+		}
 		if h.ModuloDoDestino != "" {
 			linha += " dentro de " + h.ModuloDoDestino
 		} else {
@@ -326,6 +407,13 @@ func avaliarHooks(hooks []HookDetectado, processo string) []Sinal {
 		linha += fmt.Sprintf("  [memoria: %s | disco: %s]", h.BytesEmMemoria, h.BytesNoDisco)
 		if h.ModuloDoDestino == "" && h.TipoDoDestino == "privada (sem arquivo)" {
 			paraPrivada = append(paraPrivada, linha)
+			continue
+		}
+		if dono, ok := donoDoHook(h); ok {
+			if _, existe := porDono[dono]; !existe {
+				ordemDonos = append(ordemDonos, dono)
+			}
+			porDono[dono] = append(porDono[dono], linha)
 			continue
 		}
 		if _, existe := porModulo[h.Modulo]; !existe {
@@ -337,7 +425,7 @@ func avaliarHooks(hooks []HookDetectado, processo string) []Sinal {
 	var sinais []Sinal
 	if len(paraPrivada) > 0 {
 		sort.Strings(paraPrivada)
-		sinais = append(sinais, Sinal{Critico, fmt.Sprintf("%d funcao(oes) do Windows dentro de %s desviada(s) para codigo sem arquivo", len(paraPrivada), processo), strings.Join(limitaLinhas(paraPrivada, 40), "\n") + "\nO codigo da dll na memoria esta diferente do arquivo no disco, e o desvio cai em memoria privada, que nao pertence a nenhum programa instalado. Antivirus e overlay tambem desviam funcoes, mas o desvio deles cai dentro da propria dll deles. Cair em memoria sem arquivo e codigo injetado", "cheat"})
+		sinais = append(sinais, Sinal{Critico, fmt.Sprintf("%d funcao(oes) do Windows dentro de %s desviada(s) para codigo sem arquivo", len(paraPrivada), processo), strings.Join(limitaLinhas(paraPrivada, 40), "\n") + "\nO codigo da dll na memoria esta diferente do arquivo no disco, e o desvio cai em memoria privada, que nao pertence a nenhum programa instalado, mesmo depois de seguir os trampolins. O FiveM, antivirus e overlays tambem desviam funcoes, mas o destino final deles e uma dll com arquivo. Cair em memoria sem arquivo e codigo injetado ou mapeado na mao", "cheat"})
 	}
 	sort.Strings(ordem)
 	for _, modulo := range ordem {
@@ -349,6 +437,11 @@ func avaliarHooks(hooks []HookDetectado, processo string) []Sinal {
 			nota = "\nDesvio em dll grafica e o mecanismo normal de ReShade, ENB, overlay do Discord e RivaTuner. So vale como indicio se o destino nao tiver dono conhecido"
 		}
 		sinais = append(sinais, Sinal{sev, fmt.Sprintf("%d desvio(s) de funcao em %s dentro de %s", len(linhas), modulo, processo), strings.Join(limitaLinhas(linhas, 40), "\n") + nota, "suspeito"})
+	}
+	sort.Strings(ordemDonos)
+	for _, dono := range ordemDonos {
+		linhas := porDono[dono]
+		sinais = append(sinais, Sinal{Info, fmt.Sprintf("%d desvio(s) de funcao dentro de %s com dono conhecido: %s", len(linhas), processo, dono), strings.Join(limitaLinhas(linhas, 60), "\n") + "\nO proprio FiveM desvia dezenas de funcoes do Windows (arquivos, rede, processos) para funcionar, e overlays e gravadores desviam as graficas. O destino final tem arquivo e dono conhecido, entao nao e indicio", ""})
 	}
 	return ordenaSinais(sinais)
 }

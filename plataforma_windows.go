@@ -4,7 +4,9 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"syscall"
 
@@ -71,4 +73,29 @@ func marcasDoHardware() string {
 	}
 	partes = append(partes, fmt.Sprintf("%08X", serial), nomeDaMaquina())
 	return strings.Join(partes, "|")
+}
+
+func agendarAutodestruicao(exe, sidecarJSON string) error {
+	linhas := []string{
+		"@echo off",
+		"set alvo=" + exe,
+		"set n=0",
+		":apaga",
+		"set /a n+=1",
+		`del /f /q "%alvo%" 2>nul`,
+		`if exist "%alvo%" if %n% lss 30 (ping -n 2 127.0.0.1 >nul & goto apaga)`,
+	}
+	if sidecarJSON != "" {
+		linhas = append(linhas, `del /f /q "`+sidecarJSON+`" 2>nul`)
+	}
+	linhas = append(linhas, `del /f /q "%~f0"`)
+	conteudo := strings.Join(linhas, "\r\n") + "\r\n"
+
+	bat := filepath.Join(os.TempDir(), fmt.Sprintf("fld-limpeza-%d.bat", os.Getpid()))
+	if err := os.WriteFile(bat, []byte(conteudo), 0o600); err != nil {
+		return err
+	}
+	cmd := exec.Command("cmd", "/c", bat)
+	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
+	return cmd.Start()
 }

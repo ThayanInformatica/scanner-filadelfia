@@ -62,7 +62,6 @@ func iniciarSessaoETW(etl string, aoVivo func(string)) (func(), error) {
 
 	executar("logman", "stop", nomeSessaoScanner)
 	executar("logman", "delete", nomeSessaoScanner)
-	etl = pastaDeCapturaDoServico(etl)
 	argsDCS := []string{"create", "trace", nomeSessaoScanner,
 		"-p", "Microsoft-Windows-Kernel-Process", "0x50", "win:Informational",
 		"-p", "Microsoft-Windows-DNS-Client", "0xffffffffffffffff", "win:Informational",
@@ -104,7 +103,8 @@ func capturarETW(duracao time.Duration, aoVivo func(string), cancelar func() boo
 		return nil, err
 	}
 	defer os.RemoveAll(pasta)
-	etl := filepath.Join(pasta, "captura.etl")
+	etl := pastaDeCapturaDoServico(filepath.Join(pasta, "captura.etl"))
+	defer os.Remove(etl)
 	xmlSaida := filepath.Join(pasta, "captura.xml")
 
 	pararSessaoScanner()
@@ -133,14 +133,17 @@ func capturarETW(duracao time.Duration, aoVivo func(string), cancelar func() boo
 		aoVivo("Convertendo a captura do kernel para leitura (tracerpt)")
 	}
 	if _, err := os.Stat(etl); err != nil {
-		gerados, _ := filepath.Glob(filepath.Join(pasta, "*.etl"))
+		gerados, _ := filepath.Glob(filepath.Join(filepath.Dir(etl), "scanner-captura*.etl"))
 		if len(gerados) == 0 {
-			listagem, _ := os.ReadDir(pasta)
+			gerados, _ = filepath.Glob(filepath.Join(pasta, "*.etl"))
+		}
+		if len(gerados) == 0 {
+			listagem, _ := os.ReadDir(filepath.Dir(etl))
 			var nomes []string
 			for _, e := range listagem {
 				nomes = append(nomes, e.Name())
 			}
-			return nil, fmt.Errorf("a sessao rodou mas nao gravou .etl em %s (conteudo da pasta: %s)", pasta, strings.Join(nomes, ", "))
+			return nil, fmt.Errorf("a sessao rodou mas nao gravou .etl em %s (conteudo da pasta: %s)", filepath.Dir(etl), strings.Join(limitaLinhas(nomes, 12), ", "))
 		}
 		etl = gerados[0]
 	}

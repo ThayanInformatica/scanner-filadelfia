@@ -512,7 +512,7 @@ func TestPacoteCitizenOficialVsAdulterado(t *testing.T) {
 
 	adulterado := append(append([]ItemDePacote{}, oficiais...), ItemDePacote{Nome: `citizen\bypass.dll`, Tamanho: 500 * 1024})
 	s = avaliarPacote(PacoteAnalisado{Caminho: `C:\Users\x\Downloads\citizen.rar`, Itens: adulterado}, a)
-	if !sinaisTem(s, Critico, "nao pertence a ela") {
+	if !sinaisTem(s, Critico, "nao pertencem a ela") {
 		t.Errorf("arquivo estranho dentro do citizen devia ser critico: %+v", s)
 	}
 }

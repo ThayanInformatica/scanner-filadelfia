@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-const versao = "2.12.2"
+const versao = "2.13.1"
 
 func main() {
 	exe, _ := os.Executable()
@@ -32,6 +32,7 @@ func main() {
 	api := flag.String("api", apiPadrao, "endereco do servidor da equipe, usado junto com -codigo")
 	codigo := flag.String("codigo", "", "codigo da equipe: baixa a lista atualizada e entrega o relatorio pelo painel")
 	exportar := flag.Bool("exportar-assinaturas", false, "grava o assinaturas.json padrao ao lado do exe e sai")
+	autodestruir := flag.Bool("autodestruir", false, "ao encerrar, apaga o proprio exe (e o assinaturas.json ao lado); o relatorio salvo e mantido")
 	flag.Parse()
 
 	if *exportar {
@@ -70,6 +71,19 @@ func main() {
 
 	auth := &Autorizacao{API: *api}
 
+	sidecar := ""
+	if info, err := os.Stat(assinaturasPadrao); err == nil && !info.IsDir() {
+		sidecar = assinaturasPadrao
+	}
+	limpar := func() {
+		if !*autodestruir {
+			return
+		}
+		if err := agendarAutodestruicao(exe, sidecar); err != nil {
+			fmt.Println("nao foi possivel agendar a autodestruicao:", err)
+		}
+	}
+
 	if *console {
 		if auth.Configurada() && *codigo != "" {
 			if err := auth.Entrar(*codigo); err != nil {
@@ -86,6 +100,7 @@ func main() {
 			}
 		}
 		rodarConsole(a, resumoAssinaturas, *saida, *rapido, *verboso, *semPausa, time.Duration(*limiteMin)*time.Minute, auth)
+		limpar()
 		return
 	}
 
@@ -119,6 +134,7 @@ func main() {
 	}
 	servidor.Espera()
 	auth.Encerrar()
+	limpar()
 }
 
 func rodarConsole(a *Assinaturas, resumoAssinaturas, saida string, rapido, verboso, semPausa bool, limite time.Duration, auth *Autorizacao) {

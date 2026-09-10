@@ -290,9 +290,9 @@ func relatarConteudo(c *Contexto, res resultadoConteudo) {
 		if recursoDeServidorFiveM(a.Caminho, existe) {
 			sev = Alerta
 			nota = "\nEsta dentro de um recurso de servidor FiveM (tem fxmanifest.lua). Script de anticheat e de administracao cita nome de cheat por natureza. Vale olhar, mas nao e o padrao de cheat, que fica solto em Downloads ou Temp"
-		} else if dentroDeSteamApps(a.Caminho) && !extensoesExecutaveisOuScripts[a.Extensao] {
+		} else if origem := dadosDeJogoInstalado(a.Caminho); origem != "" && !extensoesExecutaveisOuScripts[a.Extensao] {
 			sev = Info
-			nota = "\nArquivo de dados de um jogo da Steam. Palavra coincidente em texto de jogo, quase sempre"
+			nota = "\nArquivo de dados de " + origem + ". Palavra coincidente em texto de jogo, quase sempre"
 		}
 		titulo := fmt.Sprintf("%s contem string '%s'", tipo, a.Termos[0])
 		if len(a.Termos) > 1 {

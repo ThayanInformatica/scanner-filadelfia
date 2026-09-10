@@ -70,9 +70,13 @@ func checarRegistro(c *Contexto) {
 	}
 
 	vistos := map[string]bool{}
-	var recentes []string
+	var recentes, acessoRemoto []string
 	for _, e := range execucoes {
 		chave := strings.ToLower(e.Caminho)
+		if t := c.A.ControleRemotoAtivo(filepath.Base(e.Caminho)); t != "" && !e.Hora.IsZero() && time.Since(e.Hora) < 7*24*time.Hour && !vistos["a"+chave] {
+			vistos["a"+chave] = true
+			acessoRemoto = append(acessoRemoto, fmt.Sprintf("%s  %s  (%s, %s)", formataHora(e.Hora), e.Caminho, t, e.Fonte))
+		}
 		if classe, t := c.A.Classificar(e.Caminho); classe != SemMatch && !vistos["m"+chave] {
 			vistos["m"+chave] = true
 			r.Add(classe.Severidade(), fmt.Sprintf("Executado (%s) bate com assinatura '%s': %s", e.Fonte, t, filepath.Base(e.Caminho)), fmt.Sprintf("%s  usuario: %s\n%s", formataHora(e.Hora), e.Usuario, e.Caminho))
@@ -90,6 +94,9 @@ func checarRegistro(c *Contexto) {
 	}
 	if len(recentes) > 0 {
 		r.Add(Info, fmt.Sprintf("Ultimos executaveis registrados no BAM (7 dias): %d", len(recentes)), strings.Join(limita(recentes, 240), "\n"))
+	}
+	if len(acessoRemoto) > 0 {
+		r.Add(Alerta, fmt.Sprintf("Ferramenta de acesso remoto executada nos ultimos 7 dias: %d", len(acessoRemoto)), strings.Join(limita(acessoRemoto, 20), "\n")+"\nAnyDesk, RustDesk e afins sao normais para suporte, mas tambem sao o jeito padrao de vendedor de cheat instalar e configurar no PC do cliente. Pergunte ao jogador quem acessou o PC e por que")
 	}
 
 	for _, p := range c.Perfis {

@@ -47,6 +47,9 @@ func coletarEstadoDoWindows(c *Contexto) EstadoDoWindows {
 		raiz = "C:"
 	}
 	for relativo, descricao := range arquivosDeFabrica {
+		if !arquivoDeFabricaEsperado(relativo) {
+			continue
+		}
 		if !existe(filepath.Join(raiz+`\`, relativo)) {
 			e.ArquivosAusentes = append(e.ArquivosAusentes, filepath.Base(relativo)+" ("+descricao+")")
 		}
@@ -133,4 +136,16 @@ func checarWindowsOriginal(c *Contexto) {
 	if len(e.ArquivosAusentes) > 0 {
 		r.Add(Info, fmt.Sprintf("Lista completa dos arquivos de fabrica removidos (%d)", len(e.ArquivosAusentes)), strings.Join(e.ArquivosAusentes, "\n"))
 	}
+}
+
+func arquivoDeFabricaEsperado(relativo string) bool {
+	if !strings.EqualFold(filepath.Base(relativo), "MRT.exe") {
+		return true
+	}
+	k, err := registry.OpenKey(registry.LOCAL_MACHINE, `SOFTWARE\Microsoft\RemovalTools\MRT`, registry.READ)
+	if err != nil {
+		return false
+	}
+	k.Close()
+	return true
 }

@@ -34,9 +34,12 @@ func carregarHiveDoAmcache(r *Relatorio) (func(), error) {
 		os.RemoveAll(pasta)
 		return nil, err
 	}
+	for _, sufixo := range []string{".LOG1", ".LOG2"} {
+		copiarArquivoAberto(original+sufixo, copia+sufixo)
+	}
 	if saida, err := executar("reg", "load", `HKLM\`+chaveAmcacheTemporaria, copia); err != nil {
 		os.RemoveAll(pasta)
-		return nil, errComTexto("reg load da copia", err, saida)
+		return nil, errComTexto("reg load da copia (hive com transacao pendente e sem os .LOG ao lado da ser rejeitada como corrompida)", err, saida)
 	}
 	return func() {
 		executar("reg", "unload", `HKLM\`+chaveAmcacheTemporaria)

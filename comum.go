@@ -395,6 +395,27 @@ func dentroDeSteamApps(caminho string) bool {
 	return strings.Contains(strings.ToLower(caminho), `\steamapps\common\`)
 }
 
+func dadosDeJogoInstalado(caminho string) string {
+	c := strings.ToLower(caminho)
+	switch {
+	case strings.Contains(c, `\steamapps\common\`):
+		return "jogo da Steam"
+	case strings.Contains(c, `\roblox\rbx-storage\`), strings.Contains(c, `\roblox\versions\`), strings.Contains(c, `\roblox\downloads\`):
+		return "Roblox (cache e traducoes do proprio jogo)"
+	case strings.Contains(c, `\epic games\`) && strings.Contains(c, `\content\`):
+		return "jogo da Epic"
+	case strings.Contains(c, `\.minecraft\`) && !strings.Contains(c, `\mods\`):
+		return "Minecraft (assets do proprio jogo)"
+	}
+	return ""
+}
+
+var reConteudoInternoDaCitizen = regexp.MustCompile(`^(natives_[0-9a-f]{8}|natives_server|natives_universal|ny_universal|rdr3_universal|ui|ui-big)\.zip$`)
+
+func conteudoInternoDaCitizen(nome string) bool {
+	return reConteudoInternoDaCitizen.MatchString(strings.ToLower(nome))
+}
+
 func contaDeServicoDoWindows(usuario string) bool {
 	u := strings.ToLower(strings.TrimSpace(usuario))
 	for _, conta := range []string{"local service", "servi", "network service", "servico de rede", "system", "sistema", "nt authority", "autoridade nt", "local system"} {

@@ -49,3 +49,5 @@ func marcasDoHardware() string {
 	nome, _ := os.Hostname()
 	return "outros|" + nome
 }
+
+func agendarAutodestruicao(exe, sidecarJSON string) error { return nil }

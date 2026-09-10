@@ -250,17 +250,18 @@ func checarThreadsDoJogo(c *Contexto, p Processo) {
 		r.Erro("modulos de %s: %v", p.Nome, err)
 		return
 	}
-	dono := func(endereco uint64) string {
+	dono := func(endereco uint64) (string, string) {
 		for _, m := range modulos {
 			if endereco >= m.Base && endereco < m.Base+m.Tamanho {
-				return m.Nome
+				return m.Nome, m.Caminho
 			}
 		}
-		return ""
+		return "", ""
 	}
 	var analisadas []ThreadAnalisada
 	for _, t := range threads {
-		a := ThreadAnalisada{TID: t.TID, Inicial: t.Inicial, Modulo: dono(t.Inicial)}
+		a := ThreadAnalisada{TID: t.TID, Inicial: t.Inicial}
+		a.Modulo, _ = dono(t.Inicial)
 		if a.Modulo == "" && t.Inicial != 0 {
 			a.TipoDaRegiao, a.Protecao, _ = descreverRegiao(p.PID, t.Inicial)
 			if dados, err := lerMemoria(p.PID, t.Inicial&^0xFFF, 4096); err == nil {
@@ -290,13 +291,20 @@ func checarHooksNoJogo(c *Contexto, p Processo) {
 	if err != nil {
 		return
 	}
-	dono := func(endereco uint64) string {
+	dono := func(endereco uint64) (string, string) {
 		for _, m := range modulos {
 			if endereco >= m.Base && endereco < m.Base+m.Tamanho {
-				return m.Nome
+				return m.Nome, m.Caminho
 			}
 		}
-		return ""
+		return "", ""
+	}
+	ler := func(endereco uint64, tamanho int) []byte {
+		dados, err := lerMemoria(p.PID, endereco, tamanho)
+		if err != nil {
+			return nil
+		}
+		return dados
 	}
 	interessa := func(nome string) bool {
 		lower := strings.ToLower(nome)
@@ -344,14 +352,18 @@ func checarHooksNoJogo(c *Contexto, p Processo) {
 				continue
 			}
 			encontrados++
+			final, saltos := seguirDesvios(naMemoria[i:fim], endereco, ler, 4)
+			if destino == 0 {
+				destino = final
+			}
 			h := HookDetectado{
-				Modulo: m.Nome, Deslocamento: rva + uint64(i), Endereco: endereco, Destino: destino,
+				Modulo: m.Nome, Deslocamento: rva + uint64(i), Endereco: endereco, Destino: destino, DestinoFinal: final, Saltos: saltos,
 				BytesEmMemoria: emHexa(naMemoria[i:fim], 8), BytesNoDisco: emHexa(noDisco[i:fim], 8),
 			}
-			if destino != 0 {
-				h.ModuloDoDestino = dono(destino)
+			if final != 0 {
+				h.ModuloDoDestino, h.CaminhoDoDestino = dono(final)
 				if h.ModuloDoDestino == "" {
-					h.TipoDoDestino, _, _ = descreverRegiao(p.PID, destino)
+					h.TipoDoDestino, _, _ = descreverRegiao(p.PID, final)
 				}
 			} else {
 				h.TipoDoDestino = "indireta (salto por ponteiro)"
