@@ -53,7 +53,7 @@ func TestAmcacheAcusaNomeHashEApagado(t *testing.T) {
 	for _, esperado := range []string{
 		"CRITICO Amcache: 'eulen' JA RODOU",
 		"NAO existe mais no disco",
-		"CRITICO Amcache: programa com HASH de cheat conhecido ja rodou: qz8k1m2p.exe",
+		"CRITICO Amcache: programa com HASH conhecido ja rodou: qz8k1m2p.exe",
 		"loader do eulen v3",
 		"ALERTA Amcache: ferramenta de injecao/debug/macro 'cheat engine' ja rodou",
 		"nome aleatorio rodaram de pasta temporaria",

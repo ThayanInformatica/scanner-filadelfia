@@ -308,7 +308,7 @@ func checarArquivos(c *Contexto) {
 				}
 				return nil
 			}
-			if vistos[lower] || c.A.Ignorar(lower) || ehOProprioScanner(caminho, 0) || arquivoDoProprioKit(caminho) {
+			if vistos[lower] || c.A.Ignorar(lower) || ehCopiaDoScanner(caminho) || arquivoDoProprioKit(caminho) {
 				return nil
 			}
 			vistos[lower] = true
@@ -343,7 +343,8 @@ func checarArquivos(c *Contexto) {
 					hora = info.ModTime()
 				}
 				if c.A.DriverVulneravel(strings.ToLower(d.Name())) {
-					r.Add(Alerta, "Driver da lista de vulneraveis (BYOVD) no disco: "+d.Name(), caminho+"\nmodificado: "+formataHora(hora)+"\nPode ser de utilitario de hardware. Conferir se o programa dono esta instalado")
+					sevDisco, notaDisco := severidadeDeDriverInstalado(caminho)
+					r.Add(sevDisco, "Driver da lista de vulneraveis (BYOVD) no disco: "+d.Name(), caminho+"\nmodificado: "+formataHora(hora)+notaDisco)
 					return nil
 				}
 				if driverDeAnticheatConhecido(d.Name()) {
@@ -398,7 +399,11 @@ func checarArquivos(c *Contexto) {
 		if a.driver {
 			titulo = "Driver com HASH conhecido no disco: " + a.nome
 		}
-		r.Add(Critico, titulo, a.caminho+"\nSHA256: "+a.hash+"\nBate com: "+a.rotulo+"\nO hash nao muda quando o arquivo e renomeado")
+		sev, nota, _ := severidadeDeHashDeDriver(a.rotulo, a.caminho)
+		if rotuloDeDriverVulneravelConhecido(a.rotulo) && c.A.DriverVulneravel(strings.ToLower(a.nome)) {
+			continue
+		}
+		r.Add(sev, titulo, a.caminho+"\nSHA256: "+a.hash+"\nBate com: "+a.rotulo+"\nO hash nao muda quando o arquivo e renomeado"+nota)
 	}
 
 	r.Linha("%d arquivos analisados em %s", total, time.Since(inicio).Round(time.Second))

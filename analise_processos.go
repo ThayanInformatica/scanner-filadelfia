@@ -448,3 +448,43 @@ func notaDeMiraSobreposta(j JanelaVista) string {
 	}
 	return nota
 }
+
+type InstalacaoDeDriver struct {
+	Nome     string
+	Imagem   string
+	Tipo     string
+	Termo    string
+	Vezes    int
+	Primeira time.Time
+	Ultima   time.Time
+}
+
+func (d *InstalacaoDeDriver) Descrever() string {
+	linha := fmt.Sprintf("%s  [%s]  %s", d.Nome, d.Tipo, d.Imagem)
+	if d.Vezes <= 1 {
+		return formataHora(d.Ultima) + "  " + linha
+	}
+	return fmt.Sprintf("%s\nRegistrado %d vezes, de %s ate %s. Driver de utilitario sobe a cada boot e gera um evento por vez", linha, d.Vezes, formataHora(d.Primeira), formataHora(d.Ultima))
+}
+
+func severidadeDeDriverInstalado(imagem string) (Severidade, string) {
+	lower := strings.ToLower(imagem)
+	foraDoSistema := !strings.Contains(lower, `\systemroot\`) && !strings.Contains(lower, `\windows\`) && !strings.Contains(lower, `\program files`)
+	if foraDoSistema {
+		return Critico, "\nInstalado de pasta fora do Windows e do Program Files. E o padrao de mapeador de cheat (kdmapper e afins), que larga o driver em Temp ou Downloads"
+	}
+	return Alerta, "\nDrivers dessa lista sao abusados por kdmapper e afins para injetar cheat no kernel, mas tambem vem de utilitarios de hardware (MSI Afterburner, MSI Dragon Center, OpenRGB, CPU-Z, HWiNFO). Este esta na pasta de instalacao do proprio utilitario. Conferir se o programa dono esta instalado e se o jogador usa"
+}
+
+func rotuloDeDriverVulneravelConhecido(rotulo string) bool {
+	l := strings.ToLower(rotulo)
+	return strings.Contains(l, "byovd") || strings.Contains(l, "loldrivers")
+}
+
+func severidadeDeHashDeDriver(rotulo, caminho string) (Severidade, string, bool) {
+	if !rotuloDeDriverVulneravelConhecido(rotulo) {
+		return Critico, "", false
+	}
+	sev, nota := severidadeDeDriverInstalado(caminho)
+	return sev, nota, sev != Critico
+}

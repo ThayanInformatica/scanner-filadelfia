@@ -324,7 +324,8 @@ func checarDrivers(c *Contexto) {
 		switch {
 		case hashRotulo != "":
 			problemas++
-			r.Add(Critico, "Driver carregado com HASH conhecido: "+base, d+"\nBate com: "+hashRotulo+"\nHash de driver vulneravel ou malicioso da base publica. O nome pode ter sido trocado, o hash nao")
+			sevHash, notaHash, _ := severidadeDeHashDeDriver(hashRotulo, d)
+			r.Add(sevHash, "Driver carregado com HASH conhecido: "+base, d+"\nBate com: "+hashRotulo+"\nHash de driver vulneravel ou malicioso da base publica. O nome pode ter sido trocado, o hash nao"+notaHash)
 		case c.A.DriverVulneravel(base) && foraDoSistema:
 			problemas++
 			r.Add(Critico, "Driver VULNERAVEL carregado de fora do sistema: "+base, d+"\nDriver da lista BYOVD carregado de pasta fora do Windows/Program Files. Padrao de mapeador de cheat")

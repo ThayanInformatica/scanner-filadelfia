@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 	"unicode/utf8"
 )
@@ -523,6 +524,57 @@ func ehOProprioScanner(caminho string, pid int) bool {
 		return true
 	}
 	return caminho != "" && strings.EqualFold(caminho, caminhoDoProprioExe)
+}
+
+var nomeDoProprioExe = func() string {
+	if caminhoDoProprioExe == "" {
+		return ""
+	}
+	i := strings.LastIndexAny(caminhoDoProprioExe, `\/`)
+	if i < 0 {
+		return caminhoDoProprioExe
+	}
+	return caminhoDoProprioExe[i+1:]
+}()
+
+var tamanhoDoProprioExe = func() int64 {
+	if caminhoDoProprioExe == "" {
+		return 0
+	}
+	info, err := os.Stat(caminhoDoProprioExe)
+	if err != nil {
+		return 0
+	}
+	return info.Size()
+}()
+
+var hashDoProprioExe = sync.OnceValue(func() string {
+	if caminhoDoProprioExe == "" {
+		return ""
+	}
+	return sha256DoArquivo(caminhoDoProprioExe, 0)
+})
+
+func ehCopiaDoScanner(caminho string) bool {
+	if nomeDoProprioExe == "" || tamanhoDoProprioExe == 0 {
+		return false
+	}
+	if ehOProprioScanner(caminho, 0) {
+		return true
+	}
+	base := caminho
+	if i := strings.LastIndexAny(base, `\/`); i >= 0 {
+		base = base[i+1:]
+	}
+	if !strings.EqualFold(base, nomeDoProprioExe) {
+		return false
+	}
+	info, err := os.Stat(caminho)
+	if err != nil || info.Size() != tamanhoDoProprioExe {
+		return false
+	}
+	meu := hashDoProprioExe()
+	return meu != "" && sha256DoArquivo(caminho, 0) == meu
 }
 
 var (

@@ -128,3 +128,42 @@ func TestServicosLigadosNaoViramSinal(t *testing.T) {
 		t.Fatalf("menos de tres nao forma lote: %+v", s)
 	}
 }
+
+func TestDriverDeUtilitarioNaoEhCritico(t *testing.T) {
+	sev, nota := severidadeDeDriverInstalado(`C:\Program Files (x86)\MSI Afterburner\RTCore64.sys`)
+	if sev != Alerta || !strings.Contains(nota, "utilitarios de hardware") {
+		t.Fatalf("driver na pasta do proprio utilitario e alerta: %v %s", sev, nota)
+	}
+	sev, nota = severidadeDeDriverInstalado(`C:\Users\camar\AppData\Local\Temp\iqvw64e.sys`)
+	if sev != Critico || !strings.Contains(nota, "kdmapper") {
+		t.Fatalf("driver largado no Temp continua critico: %v %s", sev, nota)
+	}
+}
+
+func TestHashDeDriverVulneravelSegueOCaminho(t *testing.T) {
+	sev, _, coberto := severidadeDeHashDeDriver("driver vulneravel BYOVD (LOLDrivers): rtcore64.sys", `C:\Program Files (x86)\MSI Afterburner\RTCore64.sys`)
+	if sev != Alerta || !coberto {
+		t.Fatalf("BYOVD no Program Files e alerta e ja coberto pelo nome: %v %v", sev, coberto)
+	}
+	sev, _, coberto = severidadeDeHashDeDriver("driver vulneravel BYOVD (LOLDrivers): rtcore64.sys", `D:\citzen\RTCore64.sys`)
+	if sev != Critico || coberto {
+		t.Fatalf("mesmo driver fora do sistema continua critico: %v %v", sev, coberto)
+	}
+	sev, _, _ = severidadeDeHashDeDriver("loader do eulen v3", `C:\Program Files\x\y.exe`)
+	if sev != Critico {
+		t.Fatalf("hash de cheat de verdade e critico em qualquer pasta: %v", sev)
+	}
+}
+
+func TestInstalacaoDeDriverAgrupaRepeticao(t *testing.T) {
+	d := &InstalacaoDeDriver{Nome: "rtcore64.sys", Imagem: `C:\Program Files (x86)\MSI Afterburner\RTCore64.sys`, Tipo: "kernel mode driver", Vezes: 30,
+		Primeira: time.Date(2026, 8, 12, 9, 0, 0, 0, time.Local), Ultima: time.Date(2026, 9, 10, 18, 51, 20, 0, time.Local)}
+	texto := d.Descrever()
+	if !strings.Contains(texto, "Registrado 30 vezes") || !strings.Contains(texto, "sobe a cada boot") {
+		t.Fatalf("tem que agrupar as repeticoes numa linha so: %s", texto)
+	}
+	unico := &InstalacaoDeDriver{Nome: "x.sys", Imagem: `C:\x.sys`, Tipo: "kernel", Vezes: 1, Ultima: time.Date(2026, 9, 1, 10, 0, 0, 0, time.Local)}
+	if strings.Contains(unico.Descrever(), "Registrado") {
+		t.Fatalf("uma vez so nao ganha contagem: %s", unico.Descrever())
+	}
+}

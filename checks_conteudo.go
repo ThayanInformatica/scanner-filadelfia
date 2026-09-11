@@ -58,7 +58,7 @@ type resultadoConteudo struct {
 func ignorarNoConteudo(caminho string, a *Assinaturas) bool {
 	lower := strings.ToLower(caminho)
 	base := filepath.Base(lower)
-	if arquivoDeRelatorioDoScanner(base) || base == "assinaturas.json" || base == "assinaturas.exemplo.json" || ehOProprioScanner(caminho, 0) || arquivoDoProprioKit(caminho) {
+	if arquivoDeRelatorioDoScanner(base) || base == "assinaturas.json" || base == "assinaturas.exemplo.json" || ehCopiaDoScanner(caminho) || arquivoDoProprioKit(caminho) {
 		return true
 	}
 	for _, t := range trechosIgnoradosNoConteudo {

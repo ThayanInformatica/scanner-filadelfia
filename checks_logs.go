@@ -178,17 +178,35 @@ func checarLogsDeEventos(c *Contexto) {
 		var linhas []string
 		vistosServico := map[string]int{}
 		repetidos := map[string]string{}
+		porAssinatura := map[string]*InstalacaoDeDriver{}
+		porVulneravel := map[string]*InstalacaoDeDriver{}
+		var ordemAssinatura, ordemVulneravel []string
+		acumula := func(destino map[string]*InstalacaoDeDriver, ordem *[]string, chave, nome, imagem, tipo, termo string, hora time.Time) {
+			d, existe := destino[chave]
+			if !existe {
+				d = &InstalacaoDeDriver{Nome: nome, Imagem: imagem, Tipo: tipo, Termo: termo}
+				destino[chave] = d
+				*ordem = append(*ordem, chave)
+			}
+			d.Vezes++
+			if d.Primeira.IsZero() || hora.Before(d.Primeira) {
+				d.Primeira = hora
+			}
+			if hora.After(d.Ultima) {
+				d.Ultima = hora
+			}
+		}
 		for _, e := range servicosNovos {
 			nome := e.Dados["ServiceName"]
 			imagem := e.Dados["ImagePath"]
 			tipo := e.Dados["ServiceType"]
 			linha := fmt.Sprintf("%s  %s  [%s]  %s", formataHora(e.Hora), nome, tipo, imagem)
 			if classe, t := c.A.Classificar(nome + " " + imagem); classe != SemMatch {
-				r.Add(classe.Severidade(), "Servico/driver instalado bate com assinatura '"+t+"'", linha)
+				acumula(porAssinatura, &ordemAssinatura, strings.ToLower(nome+"|"+imagem)+"|"+t, nome, imagem, tipo, t, e.Hora)
 				continue
 			}
 			if base := strings.ToLower(nomeBase(imagem)); c.A.DriverVulneravel(base) {
-				r.Add(Critico, "Driver VULNERAVEL instalado como servico: "+base, linha)
+				acumula(porVulneravel, &ordemVulneravel, strings.ToLower(imagem), base, imagem, tipo, "", e.Hora)
 				continue
 			}
 			img := strings.ToLower(imagem)
@@ -201,6 +219,16 @@ func checarLogsDeEventos(c *Contexto) {
 				continue
 			}
 			linhas = append(linhas, linha)
+		}
+		for _, chave := range ordemAssinatura {
+			d := porAssinatura[chave]
+			classe, _ := c.A.Classificar(d.Nome + " " + d.Imagem)
+			r.Add(classe.Severidade(), "Servico/driver instalado bate com assinatura '"+d.Termo+"': "+d.Nome, d.Descrever())
+		}
+		for _, chave := range ordemVulneravel {
+			d := porVulneravel[chave]
+			sev, nota := severidadeDeDriverInstalado(d.Imagem)
+			r.Add(sev, "Driver VULNERAVEL instalado como servico: "+d.Nome, d.Descrever()+nota)
 		}
 		if len(linhas) > 0 {
 			r.Add(Info, fmt.Sprintf("%d servico(s)/driver(s) instalado(s) nos ultimos 30 dias", len(linhas)), strings.Join(limita(linhas, 100), "\n"))

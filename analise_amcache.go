@@ -54,7 +54,12 @@ func avaliarAmcache(entradas []EntradaAmcache, a *Assinaturas) []Sinal {
 		}
 		if rotulo := a.HashConhecido(e.SHA1); rotulo != "" && !vistos["h"+e.SHA1] {
 			vistos["h"+e.SHA1] = true
-			sinais = append(sinais, Sinal{Critico, "Amcache: programa com HASH de cheat conhecido ja rodou: " + base, e.Caminho + hashInfo + "\nBate com: " + rotulo + "\nO hash nao muda quando o arquivo e renomeado" + sufixo, "cheat"})
+			sevHash, notaHash, _ := severidadeDeHashDeDriver(rotulo, e.Caminho)
+			situacao := "cheat"
+			if sevHash != Critico {
+				situacao = "suspeito"
+			}
+			sinais = append(sinais, Sinal{sevHash, "Amcache: programa com HASH conhecido ja rodou: " + base, e.Caminho + hashInfo + "\nBate com: " + rotulo + "\nO hash nao muda quando o arquivo e renomeado" + sufixo + notaHash, situacao})
 			continue
 		}
 		if t := a.Marca(e.Caminho); t != "" && !vistos["m"+t+strings.ToLower(e.Caminho)] {
