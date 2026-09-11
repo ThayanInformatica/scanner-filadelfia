@@ -18,13 +18,15 @@ type ItemDePacote struct {
 }
 
 type PacoteAnalisado struct {
-	Caminho    string
-	Formato    string
-	Itens      []ItemDePacote
-	Truncado   bool
-	Erro       string
-	Modificado time.Time
-	Tamanho    int64
+	Caminho           string
+	Formato           string
+	Itens             []ItemDePacote
+	Truncado          bool
+	Erro              string
+	Modificado        time.Time
+	Tamanho           int64
+	ProtegidoPorSenha bool
+	ListagemIlegivel  bool
 }
 
 var extensoesDePacote = map[string]string{
@@ -61,6 +63,15 @@ var extensoesPerigosasEmPacote = map[string]string{
 }
 
 func avaliarPacote(p PacoteAnalisado, a *Assinaturas) []Sinal {
+	if p.ProtegidoPorSenha || p.ListagemIlegivel {
+		sev := Alerta
+		nota := "\nPacote com senha esconde de qualquer checagem o que tem dentro, inclusive do antivirus. Programa e jogo de verdade nao sao distribuidos assim. E o formato padrao de entrega de cheat, justamente para passar batido. Peca a senha ao jogador e abra na frente dele"
+		if pastaQuente(p.Caminho) || arquivoDoUniversoDoJogo(nomeBase(p.Caminho)) != "" {
+			sev = Critico
+		}
+		return []Sinal{{sev, "Pacote PROTEGIDO POR SENHA, nao deu para ver o conteudo: " + nomeBase(p.Caminho),
+			p.Caminho + "\n" + formataHora(p.Modificado) + "  " + formataTamanho(p.Tamanho) + "\n" + p.Erro + nota, "suspeito"}}
+	}
 	if p.Erro != "" {
 		return []Sinal{{Info, "Nao consegui abrir o pacote " + nomeBase(p.Caminho), p.Caminho + "\n" + p.Erro + "\nAbra manualmente para conferir o conteudo", ""}}
 	}
@@ -431,4 +442,86 @@ func sinalDePacoteComCitizen(p PacoteAnalisado, perigosos, estranhos []string) S
 	return Sinal{Critico, fmt.Sprintf("%s traz a pasta 'citizen' do FiveM junto com %d arquivo(s) que nao pertencem a ela", base, len(estranhos)),
 		p.Caminho + "\nFora da estrutura da citizen:\n  " + strings.Join(limitaLinhas(linhas, 20), "\n  ") + "\nDa citizen:\n  " + strings.Join(limitaLinhas(perigosos, 20), "\n  ") +
 			"\nPacote com a pasta 'citizen' do FiveM mais script ou dll solto ao lado e a entrega classica de executor: a citizen trocada carrega o script. Abra o pacote e leia o que e cada arquivo solto", "cheat"}
+}
+
+func nomeDeArquivoPlausivel(nome string) bool {
+	base := nomeBase(nome)
+	ponto := strings.LastIndex(base, ".")
+	if ponto <= 0 || ponto == len(base)-1 {
+		return false
+	}
+	if ponto < 3 {
+		return false
+	}
+	ext := base[ponto+1:]
+	if len(ext) > 5 {
+		return false
+	}
+	for _, c := range ext {
+		if !(c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9') {
+			return false
+		}
+	}
+	comuns := 0
+	for _, c := range base[:ponto] {
+		if c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || c == '_' || c == '-' || c == ' ' {
+			comuns++
+		}
+	}
+	return comuns*10 >= ponto*9
+}
+
+func listagemPareceLixo(itens []ItemDePacote) bool {
+	if len(itens) < 5 {
+		return false
+	}
+	plausiveis := 0
+	for _, i := range itens {
+		if nomeDeArquivoPlausivel(i.Nome) {
+			plausiveis++
+		}
+	}
+	return plausiveis*100 < len(itens)*45
+}
+
+func rarComSenha(dados []byte) bool {
+	if len(dados) < 12 {
+		return false
+	}
+	if string(dados[:8]) == "Rar!\x1a\x07\x01\x00" {
+		return primeiroBlocoRar5EhCripto(dados[8:])
+	}
+	if string(dados[:7]) == "Rar!\x1a\x07\x00" {
+		if len(dados) < 13 {
+			return false
+		}
+		flags := uint16(dados[10]) | uint16(dados[11])<<8
+		return flags&0x0080 != 0
+	}
+	return false
+}
+
+func primeiroBlocoRar5EhCripto(bloco []byte) bool {
+	if len(bloco) < 6 {
+		return false
+	}
+	pos := 4
+	if _, n, ok := lerVIntRar(bloco[pos:]); ok {
+		pos += n
+	} else {
+		return false
+	}
+	tipo, _, ok := lerVIntRar(bloco[pos:])
+	return ok && tipo == 4
+}
+
+func lerVIntRar(dados []byte) (uint64, int, bool) {
+	var valor uint64
+	for i := 0; i < len(dados) && i < 10; i++ {
+		valor |= uint64(dados[i]&0x7f) << (7 * i)
+		if dados[i]&0x80 == 0 {
+			return valor, i + 1, true
+		}
+	}
+	return 0, 0, false
 }

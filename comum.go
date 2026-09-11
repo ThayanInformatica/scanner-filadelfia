@@ -596,3 +596,16 @@ func descreveLimite(limite time.Duration) string {
 	}
 	return "limite de " + limite.Round(time.Second).String()
 }
+
+var marcasDeListaDeFiltros = []string{"##+js(", "$xhr,redirect", "redirect=noop", ",domain=", "#@#", "$third-party", "||", "$doc,", "adsbygoogle"}
+
+func contextoDeListaDeFiltros(trecho string) bool {
+	baixo := strings.ToLower(trecho)
+	encontradas := 0
+	for _, m := range marcasDeListaDeFiltros {
+		if strings.Contains(baixo, m) {
+			encontradas++
+		}
+	}
+	return encontradas >= 2
+}

@@ -293,6 +293,9 @@ func relatarConteudo(c *Contexto, res resultadoConteudo) {
 		} else if origem := dadosDeJogoInstalado(a.Caminho); origem != "" && !extensoesExecutaveisOuScripts[a.Extensao] {
 			sev = Info
 			nota = "\nArquivo de dados de " + origem + ". Palavra coincidente em texto de jogo, quase sempre"
+		} else if contextoDeListaDeFiltros(a.Contexto) {
+			sev = Info
+			nota = "\nIsto e lista de filtro de bloqueador de anuncio, do navegador ou de aplicativo com navegador embutido. Ela cita dominio de cheat justamente para bloquear o anuncio dele. Nao e conteudo de cheat"
 		}
 		titulo := fmt.Sprintf("%s contem string '%s'", tipo, a.Termos[0])
 		if len(a.Termos) > 1 {

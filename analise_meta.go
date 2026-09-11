@@ -83,9 +83,14 @@ func avaliarMetadadosDoJogo(m MetadadosDoJogo) []Sinal {
 		linhas = append(linhas, fmt.Sprintf("%s  (%s, %s)", a.Caminho, formataTamanho(a.Tamanho), formataHora(a.Modificado)))
 	}
 	sort.Strings(linhas)
-	sinais = append(sinais, Sinal{Critico,
+	sev, nota := Critico, notaDaPastaDeMetadados
+	if soMexeEmInterface(m.Arquivos) {
+		sev = Alerta
+		nota = "\nEsses arquivos mexem em interface, nao em arma: zoom do minimapa, HUD e tela de pausa. Uma instalacao limpa do FiveM tambem nao os tem, entao alguem colocou na mao, mas o ganho e visual e nao de tiro. Mod de minimapa que abre mais o zoom e o caso tipico"
+	}
+	sinais = append(sinais, Sinal{sev,
 		fmt.Sprintf("%d arquivo(s) .meta colocados dentro da instalacao do FiveM", len(m.Arquivos)),
-		strings.Join(limitaLinhas(linhas, 20), "\n") + "\n" + notaDaPastaDeMetadados, "cheat"})
+		strings.Join(limitaLinhas(linhas, 20), "\n") + "\n" + nota, "suspeito"})
 
 	for _, a := range m.Arquivos {
 		if s, tem := desviosDoPedAccuracy(a); tem {
@@ -146,4 +151,23 @@ func desviosDeArma(a ArquivoDeMetadados) (Sinal, bool) {
 	sort.Strings(zerados)
 	return Sinal{Critico, fmt.Sprintf("%s com %d campo(s) de precisao zerado(s)", a.Nome, len(zerados)),
 		a.Caminho + "\n" + strings.Join(zerados, "\n") + "\nDispersao, recuo e tremor de tela zerados deixam a arma perfeita. Arma custom mal configurada tambem aparece com esses campos em zero, entao confira se este arquivo veio de um pacote baixado", "cheat"}, true
+}
+
+var metadadosDeInterface = map[string]bool{
+	"mapzoomdata.meta": true, "hudcolor.meta": true, "frontend.meta": true,
+	"pausemenu.meta": true, "loadingscreen.meta": true, "hud.meta": true,
+}
+
+func soMexeEmInterface(arquivos []ArquivoDeMetadados) bool {
+	for _, a := range arquivos {
+		if metadadosDeInterface[strings.ToLower(a.Nome)] {
+			continue
+		}
+		caminho := strings.ToLower(strings.ReplaceAll(a.Caminho, "/", `\`))
+		if strings.Contains(caminho, `\ui\`) || strings.Contains(caminho, `\frontend\`) {
+			continue
+		}
+		return false
+	}
+	return len(arquivos) > 0
 }

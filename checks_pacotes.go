@@ -41,6 +41,11 @@ func abrirPacote(caminho string) PacoteAnalisado {
 	}
 
 	if itens := listarComFerramentaExterna(caminho); len(itens) > 0 {
+		if listagemPareceLixo(itens) {
+			p.ListagemIlegivel = true
+			p.Erro = "a lista de arquivos saiu ilegivel: o pacote esta criptografado, com senha ou num formato que nao consegui abrir"
+			return p
+		}
 		p.Itens = itens
 		return p
 	}
@@ -48,6 +53,11 @@ func abrirPacote(caminho string) PacoteAnalisado {
 	dados, err := os.ReadFile(caminho)
 	if err != nil {
 		p.Erro = err.Error()
+		return p
+	}
+	if rarComSenha(dados) {
+		p.ProtegidoPorSenha = true
+		p.Erro = "arquivo rar protegido por senha: o nome dos arquivos de dentro esta criptografado"
 		return p
 	}
 	limite := len(dados)
@@ -58,6 +68,12 @@ func abrirPacote(caminho string) PacoteAnalisado {
 	p.Itens = nomesDentroDoRarPorTexto(dados[:limite], 3000)
 	if len(p.Itens) == 0 {
 		p.Erro = "nao consegui ler a lista de arquivos deste formato"
+		return p
+	}
+	if listagemPareceLixo(p.Itens) {
+		p.ListagemIlegivel = true
+		p.Itens = nil
+		p.Erro = "a lista de arquivos saiu ilegivel: o pacote esta criptografado, com senha ou num formato que nao consegui abrir"
 	}
 	return p
 }
