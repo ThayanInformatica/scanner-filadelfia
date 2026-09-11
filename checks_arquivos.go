@@ -423,6 +423,37 @@ func checarArquivos(c *Contexto) {
 		r.Add(Info, fmt.Sprintf("Executaveis novos/modificados nos ultimos 7 dias em pastas do usuario: %d", len(linhas)), strings.Join(limita(linhas, 200), "\n"))
 	}
 
+	if len(recentes) > 0 {
+		var caminhos []string
+		for _, a := range recentes {
+			caminhos = append(caminhos, a.Caminho)
+		}
+		r.Progresso("Conferindo assinatura e nome interno de %d executavel(is) recente(s)", len(caminhos))
+		assinaturas := map[string][2]string{}
+		const lote = 60
+		for i := 0; i < len(caminhos); i += lote {
+			fim := i + lote
+			if fim > len(caminhos) {
+				fim = len(caminhos)
+			}
+			for k, v := range assinaturasAuthenticode(caminhos[i:fim]) {
+				assinaturas[k] = v
+			}
+		}
+		var emDisco []ExecutavelEmDisco
+		for _, a := range recentes {
+			e := ExecutavelEmDisco{Caminho: a.Caminho, Nome: filepath.Base(a.Caminho), Tamanho: a.Tamanho, Modificado: a.Hora}
+			if v, ok := assinaturas[strings.ToLower(a.Caminho)]; ok {
+				e.Assinatura, e.Assinante = v[0], v[1]
+			}
+			e.OriginalFilename, e.ProductName, e.CompanyName, _ = infoDeVersao(a.Caminho)
+			emDisco = append(emDisco, e)
+		}
+		for _, s := range avaliarExecutaveisEmDisco(emDisco) {
+			r.Add(s.Severidade, s.Titulo, s.Detalhe)
+		}
+	}
+
 	var origens []OrigemDeDownload
 	for _, a := range recentes {
 		if len(origens) >= 200 {

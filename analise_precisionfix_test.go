@@ -213,31 +213,53 @@ func TestConferenciaAoVivoComAchado(t *testing.T) {
 	}
 }
 
-func TestOrdemDeTesteAoVivoBotaVolateisNaFrente(t *testing.T) {
-	nada := func(*Contexto) {}
-	original := []Etapa{
-		{"Sistema e integridade de codigo", nada, false},
-		{"Processos, handles, overlay e drivers", nada, false},
-		{"Varredura de arquivos", nada, true},
-		{"Memoria do jogo, dos outros processos e linha do tempo", nada, false},
-		{"FiveM", nada, false},
-		{"Integridade do jogo (FiveM e GTA V)", nada, false},
-		{"Hardware (DMA, KMBox, aim assist)", nada, false},
+func TestExecutavelSePassandoPorOutroPrograma(t *testing.T) {
+	falso := ExecutavelEmDisco{
+		Caminho: `C:\Users\x\Downloads\ccleaner.exe`, Nome: "ccleaner.exe", Tamanho: 900 * 1024,
+		Modificado: time.Date(2026, 9, 10, 22, 0, 0, 0, time.Local),
 	}
-	nova := ordenarParaTesteAoVivo(original)
-	if len(nova) != len(original) {
-		t.Fatalf("nao pode perder nem duplicar etapa: %d vs %d", len(nova), len(original))
+	s := avaliarExecutaveisEmDisco([]ExecutavelEmDisco{falso})
+	if !sinaisTem(s, Critico, "se passando por ccleaner.exe") {
+		t.Fatalf("ccleaner sem assinatura da Piriform e critico: %+v", s)
 	}
-	for i, nome := range etapasVolateis {
-		if nova[i].Nome != nome {
-			t.Fatalf("posicao %d devia ser %q, veio %q", i, nome, nova[i].Nome)
-		}
+
+	verdadeiro := falso
+	verdadeiro.Assinatura, verdadeiro.Assinante, verdadeiro.CompanyName = "Valid", "Piriform Software Ltd", "Piriform Software Ltd"
+	if s := avaliarExecutaveisEmDisco([]ExecutavelEmDisco{verdadeiro}); sinaisTem(s, Critico, "se passando") {
+		t.Fatalf("ccleaner de verdade nao pode ser acusado: %+v", s)
 	}
-	if nova[len(nova)-1].Nome != "Varredura de arquivos" {
-		t.Fatalf("a varredura pesada continua por ultimo: %q", nova[len(nova)-1].Nome)
+}
+
+func TestExecutavelComNomeInternoDiferente(t *testing.T) {
+	a := ExecutavelEmDisco{
+		Caminho: `C:\Users\x\Desktop\atualizador.exe`, Nome: "atualizador.exe", Tamanho: 4096 * 1024,
+		Modificado:       time.Date(2026, 9, 10, 22, 0, 0, 0, time.Local),
+		OriginalFilename: "eulen_loader.exe", ProductName: "Loader",
 	}
-	incompleta := original[:3]
-	if len(ordenarParaTesteAoVivo(incompleta)) != 3 {
-		t.Fatal("lista sem todas as volateis volta intacta")
+	s := avaliarExecutaveisEmDisco([]ExecutavelEmDisco{a})
+	if !sinaisTem(s, Alerta, "nome diferente do nome interno") {
+		t.Fatalf("nome interno divergente vira alerta: %+v", s)
+	}
+	if !strings.Contains(s[0].Detalhe, "eulen_loader.exe") {
+		t.Fatalf("tem que mostrar o nome interno: %s", s[0].Detalhe)
+	}
+}
+
+func TestExecutavelSemIdentificacaoEhSoContexto(t *testing.T) {
+	a := ExecutavelEmDisco{
+		Caminho: `C:\Users\x\Downloads\setup.exe`, Nome: "setup.exe", Tamanho: 2048 * 1024,
+		Modificado: time.Date(2026, 9, 10, 22, 0, 0, 0, time.Local),
+	}
+	s := avaliarExecutaveisEmDisco([]ExecutavelEmDisco{a})
+	if len(s) != 1 || s[0].Severidade != Info {
+		t.Fatalf("exe sem assinatura e so contexto, nao acusacao: %+v", s)
+	}
+	assinado := a
+	assinado.Assinatura, assinado.CompanyName = "Valid", "Alguma Empresa"
+	if s := avaliarExecutaveisEmDisco([]ExecutavelEmDisco{assinado}); s != nil {
+		t.Fatalf("exe assinado nao gera nada: %+v", s)
+	}
+	if avaliarExecutaveisEmDisco(nil) != nil {
+		t.Fatal("sem arquivo, sem sinal")
 	}
 }

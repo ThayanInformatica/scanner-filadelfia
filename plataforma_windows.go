@@ -44,9 +44,6 @@ func etapasDoSistema() []Etapa {
 		{"Varredura de arquivos", checarArquivos, true},
 		{"Conferencia ao vivo", checarConferenciaAoVivo, false},
 	}
-	if testeAoVivo {
-		return ordenarParaTesteAoVivo(lista)
-	}
 	return lista
 }
 

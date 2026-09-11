@@ -1,18 +1,18 @@
 {
   "FixedFileInfo": {
-    "FileVersion": {"Major": 2, "Minor": 15, "Patch": 0, "Build": 0},
-    "ProductVersion": {"Major": 2, "Minor": 15, "Patch": 0, "Build": 0},
+    "FileVersion": {"Major": 2, "Minor": 15, "Patch": 1, "Build": 0},
+    "ProductVersion": {"Major": 2, "Minor": 15, "Patch": 1, "Build": 0},
     "FileFlagsMask": "3f", "FileFlags": "00", "FileOS": "040004", "FileType": "01", "FileSubType": "00"
   },
   "StringFileInfo": {
     "CompanyName": "Cidade Filadelfia RP",
     "FileDescription": "Scanner Filadelfia - checagem de PC para telagem",
-    "FileVersion": "2.15.0",
+    "FileVersion": "2.15.1",
     "InternalName": "scanner.exe",
     "LegalCopyright": "Cidade Filadelfia RP",
     "OriginalFilename": "scanner.exe",
     "ProductName": "Scanner Filadelfia",
-    "ProductVersion": "2.15.0",
+    "ProductVersion": "2.15.1",
     "Comments": "Ferramenta oficial de checagem de PC da cidade Filadelfia. Le apenas informacoes do proprio computador e gera um relatorio local. Nao altera nada e nao envia dados."
   },
   "VarFileInfo": {"Translation": {"LangID": "0416", "CharsetID": "04B0"}},
