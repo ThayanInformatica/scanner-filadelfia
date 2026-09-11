@@ -386,7 +386,7 @@ func checarArquivos(c *Contexto) {
 	for _, p := range pastasNormais {
 		visita(p, 7, false)
 	}
-	for _, u := range unidadesFixas() {
+	for _, u := range unidadesParaVarrer() {
 		visita(u, 3, true)
 		visita(u, 40, false)
 	}

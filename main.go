@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-const versao = "2.14.1"
+const versao = "2.15.0"
 
 func main() {
 	exe, _ := os.Executable()
@@ -32,8 +32,10 @@ func main() {
 	api := flag.String("api", apiPadrao, "endereco do servidor da equipe, usado junto com -codigo")
 	codigo := flag.String("codigo", "", "codigo da equipe: baixa a lista atualizada e entrega o relatorio pelo painel")
 	exportar := flag.Bool("exportar-assinaturas", false, "grava o assinaturas.json padrao ao lado do exe e sai")
+	aovivo := flag.Bool("aovivo", false, "teste com cheat ativo: roda primeiro as checagens que so valem com o jogo aberto")
 	autodestruir := flag.Bool("autodestruir", false, "ao encerrar, apaga o proprio exe (e o assinaturas.json ao lado); o relatorio salvo e mantido")
 	flag.Parse()
+	testeAoVivo = *aovivo
 
 	if *exportar {
 		a, _, err := CarregarAssinaturas("")

@@ -232,6 +232,26 @@ func integridadeDeCodigo() (uint32, error) {
 	return info.Opcoes, nil
 }
 
+func unidadesParaVarrer() []string {
+	mascara, err := windows.GetLogicalDrives()
+	if err != nil {
+		return []string{"C:\\"}
+	}
+	var lista []string
+	for i := 0; i < 26; i++ {
+		if mascara&(1<<i) == 0 {
+			continue
+		}
+		raiz := string(rune('A'+i)) + ":\\"
+		p, _ := syscall.UTF16PtrFromString(raiz)
+		switch windows.GetDriveType(p) {
+		case windows.DRIVE_FIXED, windows.DRIVE_REMOVABLE:
+			lista = append(lista, raiz)
+		}
+	}
+	return lista
+}
+
 func unidadesFixas() []string {
 	mascara, err := windows.GetLogicalDrives()
 	if err != nil {

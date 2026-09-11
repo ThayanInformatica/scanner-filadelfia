@@ -54,6 +54,8 @@ func checarMemoriaDoJogo(c *Contexto) {
 			continue
 		}
 		r.Linha("%s (PID %d): %d regioes executaveis fora de dll registrada, %d MB lidos em %s", p.Nome, p.PID, regioes, bytesLidos/1024/1024, time.Since(inicio).Round(time.Second))
+		c.AoVivo.RegioesExecutaveis += regioes
+		c.AoVivo.MBExecutavelLidos += int(bytesLidos / 1024 / 1024)
 		sinais := avaliarMemoriaDoJogo(achados, regioes, p.Nome)
 		for _, s := range sinais {
 			r.Add(s.Severidade, s.Titulo, s.Detalhe)
@@ -161,6 +163,7 @@ func checarMemoriaDosOutrosProcessos(c *Contexto, processos []Processo, buscador
 		alvos = append(alvos, p)
 	}
 	r.Linha("%d processos fora do Windows e fora das protecoes conhecidas para varrer na memoria", len(alvos))
+	c.AoVivo.ProcessosVarridos = len(alvos)
 	if len(alvos) == 0 {
 		return
 	}
@@ -203,6 +206,7 @@ func checarMemoriaDosOutrosProcessos(c *Contexto, processos []Processo, buscador
 		}
 	}
 	r.Linha("%d MB de memoria lidos em %d processos em %s", totalMB, len(alvos), time.Since(inicio).Round(time.Second))
+	c.AoVivo.MBOutrosLidos = int(totalMB)
 	if achou == 0 && !c.Pulou() {
 		r.Ok("Nenhum processo fora do Windows carrega nome de cheat na memoria")
 	}
@@ -229,7 +233,9 @@ func checarMemoriaDeDados(c *Contexto, p Processo, buscador *Buscador) {
 		return
 	}
 	r.Linha("%s (PID %d): %d MB de memoria de dados lidos em %s", p.Nome, p.PID, lidos/1024/1024, time.Since(inicio).Round(time.Second))
+	c.AoVivo.MBDadosLidos += int(lidos / 1024 / 1024)
 	sinais := avaliarMemoriaDeDadosDoJogo(achados, lidos, p.Nome)
+	c.AoVivo.AchadosNaMemoria += len(sinais)
 	for _, s := range sinais {
 		r.Add(s.Severidade, s.Titulo, s.Detalhe)
 	}
@@ -271,7 +277,9 @@ func checarThreadsDoJogo(c *Contexto, p Processo) {
 		analisadas = append(analisadas, a)
 	}
 	r.Linha("%s (PID %d): %d threads, %d modulos carregados", p.Nome, p.PID, len(analisadas), len(modulos))
+	c.AoVivo.ThreadsAnalisadas += len(analisadas)
 	sinais := avaliarThreadsDoJogo(analisadas, p.Nome)
+	c.AoVivo.ThreadsForaDeModulo += len(sinais)
 	for _, s := range sinais {
 		r.Add(s.Severidade, s.Titulo, s.Detalhe)
 	}
@@ -382,11 +390,21 @@ func checarHooksNoJogo(c *Contexto, p Processo) {
 		}
 	}
 	r.Linha("%s (PID %d): %d dll(s) do Windows conferidas contra o arquivo em disco", p.Nome, p.PID, conferidos)
+	c.AoVivo.DLLsConferidas += conferidos
+	c.AoVivo.HooksEncontrados += len(hooks)
 	sinais := avaliarHooks(hooks, p.Nome)
 	for _, s := range sinais {
 		r.Add(s.Severidade, s.Titulo, s.Detalhe)
 	}
 	if len(sinais) == 0 && conferidos > 0 {
 		r.Ok("Nenhuma funcao do Windows desviada dentro de %s", p.Nome)
+	}
+}
+
+func checarConferenciaAoVivo(c *Contexto) {
+	r := c.R
+	r.Secao("CONFERENCIA AO VIVO (o que so da para ver com o jogo aberto)")
+	for _, s := range avaliarConferenciaAoVivo(c.AoVivo) {
+		r.Add(s.Severidade, s.Titulo, s.Detalhe)
 	}
 }

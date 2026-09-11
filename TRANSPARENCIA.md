@@ -39,6 +39,7 @@ Le so esse fluxo, so em executavel, e so o endereco.
 **Processos e memoria** (`checks_processos.go`, `checks_memoria.go`)
 Lista de processos com caminho, processo pai e assinatura digital, modulos carregados,
 janelas abertas, handles abertos no FiveM, e regioes de memoria executaveis do proprio FiveM.
+A varredura de arquivos passa tambem por pendrive conectado, alem dos discos fixos.
 
 De cada janela le tamanho, posicao, estilo e se ela pediu ao Windows para nao aparecer em
 captura de tela. Serve para achar mira e ESP desenhados por cima do jogo. Nao le o conteudo

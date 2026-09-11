@@ -596,3 +596,35 @@ func descreveLimite(limite time.Duration) string {
 	}
 	return "limite de " + limite.Round(time.Second).String()
 }
+
+var testeAoVivo bool
+
+var etapasVolateis = []string{
+	"Processos, handles, overlay e drivers",
+	"Memoria do jogo, dos outros processos e linha do tempo",
+	"FiveM",
+	"Integridade do jogo (FiveM e GTA V)",
+	"Hardware (DMA, KMBox, aim assist)",
+}
+
+func ordenarParaTesteAoVivo(etapas []Etapa) []Etapa {
+	posicao := map[string]int{}
+	for i, nome := range etapasVolateis {
+		posicao[nome] = i
+	}
+	primeiras := make([]Etapa, len(etapasVolateis))
+	var resto []Etapa
+	achadas := 0
+	for _, e := range etapas {
+		if i, ok := posicao[e.Nome]; ok {
+			primeiras[i] = e
+			achadas++
+			continue
+		}
+		resto = append(resto, e)
+	}
+	if achadas != len(etapasVolateis) {
+		return etapas
+	}
+	return append(primeiras, resto...)
+}

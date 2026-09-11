@@ -167,3 +167,77 @@ func TestInstalacaoDeDriverAgrupaRepeticao(t *testing.T) {
 		t.Fatalf("uma vez so nao ganha contagem: %s", unico.Descrever())
 	}
 }
+
+func TestConferenciaAoVivoSemJogoAberto(t *testing.T) {
+	s := avaliarConferenciaAoVivo(ConferidoAoVivo{})
+	if len(s) != 1 || s[0].Severidade != Alerta || !strings.Contains(s[0].Titulo, "NAO valem") {
+		t.Fatalf("sem jogo aberto tem que avisar que o relatorio nao inocenta: %+v", s)
+	}
+	if !strings.Contains(s[0].Detalhe, "deixe o cheat ligado") {
+		t.Fatalf("tem que ensinar como refazer o teste: %s", s[0].Detalhe)
+	}
+}
+
+func TestConferenciaAoVivoTudoLimpo(t *testing.T) {
+	v := ConferidoAoVivo{
+		JogoAberto: true, NomeDoJogo: "FiveM_b3258_GTAProcess.exe", PIDDoJogo: 8248, ProcessosListados: 223,
+		ModulosDoJogo: 293, HandlesNoJogo: 8, JanelasAnalisadas: 302, DriversCarregados: 179,
+		MBExecutavelLidos: 1, MBDadosLidos: 4097, ThreadsAnalisadas: 262, DLLsConferidas: 10,
+		ProcessosVarridos: 24, MBOutrosLidos: 1780,
+	}
+	s := avaliarConferenciaAoVivo(v)
+	if len(s) != 1 || s[0].Severidade != Info || !strings.Contains(s[0].Titulo, "nao acharam nada") {
+		t.Fatalf("tudo conferido e nada achado e informativo: %+v", s)
+	}
+	if !strings.Contains(s[0].Detalhe, "PID 8248") || !strings.Contains(s[0].Detalhe, "4097 MB") {
+		t.Fatalf("o resumo tem que mostrar o que foi medido: %s", s[0].Detalhe)
+	}
+	if strings.Contains(s[0].Detalhe, "Nao deu para conferir") {
+		t.Fatalf("com tudo preenchido nao pode sobrar checagem sem rodar: %s", s[0].Detalhe)
+	}
+}
+
+func TestConferenciaAoVivoComAchado(t *testing.T) {
+	v := ConferidoAoVivo{
+		JogoAberto: true, NomeDoJogo: "FiveM_b3258_GTAProcess.exe", PIDDoJogo: 8248,
+		ModulosDoJogo: 293, ModulosDesconhecidos: 1, HandlesNoJogo: 9, HandlesComEscrita: 1,
+		MBDadosLidos: 4097, AchadosNaMemoria: 2, ThreadsAnalisadas: 262, DLLsConferidas: 10,
+		JanelasAnalisadas: 302, DriversCarregados: 179, ProcessosVarridos: 24,
+	}
+	s := avaliarConferenciaAoVivo(v)
+	if len(s) != 1 || s[0].Severidade != Critico || !strings.Contains(s[0].Titulo, "4 achado(s)") {
+		t.Fatalf("achado ao vivo e critico e conta o total: %+v", s)
+	}
+	if !strings.Contains(s[0].Detalhe, "ACHADO(S)") {
+		t.Fatalf("tem que marcar qual checagem achou: %s", s[0].Detalhe)
+	}
+}
+
+func TestOrdemDeTesteAoVivoBotaVolateisNaFrente(t *testing.T) {
+	nada := func(*Contexto) {}
+	original := []Etapa{
+		{"Sistema e integridade de codigo", nada, false},
+		{"Processos, handles, overlay e drivers", nada, false},
+		{"Varredura de arquivos", nada, true},
+		{"Memoria do jogo, dos outros processos e linha do tempo", nada, false},
+		{"FiveM", nada, false},
+		{"Integridade do jogo (FiveM e GTA V)", nada, false},
+		{"Hardware (DMA, KMBox, aim assist)", nada, false},
+	}
+	nova := ordenarParaTesteAoVivo(original)
+	if len(nova) != len(original) {
+		t.Fatalf("nao pode perder nem duplicar etapa: %d vs %d", len(nova), len(original))
+	}
+	for i, nome := range etapasVolateis {
+		if nova[i].Nome != nome {
+			t.Fatalf("posicao %d devia ser %q, veio %q", i, nome, nova[i].Nome)
+		}
+	}
+	if nova[len(nova)-1].Nome != "Varredura de arquivos" {
+		t.Fatalf("a varredura pesada continua por ultimo: %q", nova[len(nova)-1].Nome)
+	}
+	incompleta := original[:3]
+	if len(ordenarParaTesteAoVivo(incompleta)) != 3 {
+		t.Fatal("lista sem todas as volateis volta intacta")
+	}
+}

@@ -24,6 +24,7 @@ type Contexto struct {
 	Execucoes              []EventoDeExecucao
 	AssinaturasDeProcessos map[string][2]string
 	Rastros                RastrosDeExecucao
+	AoVivo                 ConferidoAoVivo
 }
 
 func (c *Contexto) PedirParaPular() {

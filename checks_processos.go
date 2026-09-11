@@ -28,6 +28,7 @@ func checarProcessos(c *Contexto) {
 		return
 	}
 	r.Linha("%d processos em execucao", len(processos))
+	c.AoVivo.ProcessosListados = len(processos)
 	agora := time.Now()
 
 	porPID := map[uint32]Processo{}
@@ -206,6 +207,10 @@ func checarModulosDoFiveM(c *Contexto, p Processo) {
 		return
 	}
 	r.Linha("FiveM %s (PID %d) com %d modulos carregados", p.Nome, p.PID, len(modulos))
+	c.AoVivo.JogoAberto = true
+	c.AoVivo.NomeDoJogo = p.Nome
+	c.AoVivo.PIDDoJogo = int(p.PID)
+	c.AoVivo.ModulosDoJogo = len(modulos)
 	estranhos := 0
 	for _, m := range modulos {
 		if classe, t := c.A.Classificar(m.Nome + " " + m.Caminho); classe != SemMatch {
@@ -239,6 +244,7 @@ func checarModulosDoFiveM(c *Contexto, p Processo) {
 			r.Modulo(int(p.PID), m.Nome, m.Caminho, "")
 		}
 	}
+	c.AoVivo.ModulosDesconhecidos = estranhos
 	if estranhos == 0 {
 		r.Ok("Nenhum modulo de pasta desconhecida no FiveM (PID %d). Cheats com manual map nao aparecem aqui", p.PID)
 	}
@@ -261,7 +267,9 @@ func checarHandlesNoFiveM(c *Contexto, p Processo, porPID map[uint32]Processo) {
 		}
 	}
 	r.Linha("%d handle(s) de outros processos apontando para o FiveM", len(handles))
+	c.AoVivo.HandlesNoJogo = len(handles)
 	sinais := avaliarHandlesNoFiveM(handles, c.A)
+	c.AoVivo.HandlesComEscrita = len(sinais)
 	for _, s := range sinais {
 		r.Add(s.Severidade, s.Titulo, s.Detalhe)
 	}
@@ -292,6 +300,8 @@ func checarJanelas(c *Contexto, porPID map[uint32]Processo) {
 	}
 	w, h := tamanhoDaTela()
 	sinais := avaliarJanelas(janelas, w, h, c.A)
+	c.AoVivo.JanelasAnalisadas = len(janelas)
+	c.AoVivo.OverlaysAcusados = len(sinais)
 	for _, s := range sinais {
 		r.Add(s.Severidade, s.Titulo, s.Detalhe)
 	}
@@ -309,7 +319,9 @@ func checarDrivers(c *Contexto) {
 		return
 	}
 	r.Linha("%d drivers carregados", len(drivers))
+	c.AoVivo.DriversCarregados = len(drivers)
 	problemas := 0
+	defer func() { c.AoVivo.DriversAcusados = problemas }()
 	for _, d := range drivers {
 		base := strings.ToLower(filepath.Base(d))
 		lower := strings.ToLower(d)

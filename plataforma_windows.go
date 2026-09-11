@@ -17,7 +17,7 @@ import (
 const suportaChecagemReal = true
 
 func etapasDoSistema() []Etapa {
-	return []Etapa{
+	lista := []Etapa{
 		{"Sistema e integridade de codigo", checarSistema, false},
 		{"Origem do Windows (original ou modificado)", checarWindowsOriginal, false},
 		{"Servicos de rastreio e protecao", checarServicos, false},
@@ -42,7 +42,12 @@ func etapasDoSistema() []Etapa {
 		{"Discord", checarDiscord, false},
 		{"Strings de cheat no conteudo dos arquivos", checarConteudo, true},
 		{"Varredura de arquivos", checarArquivos, true},
+		{"Conferencia ao vivo", checarConferenciaAoVivo, false},
 	}
+	if testeAoVivo {
+		return ordenarParaTesteAoVivo(lista)
+	}
+	return lista
 }
 
 func preencherPerfis(c *Contexto) {

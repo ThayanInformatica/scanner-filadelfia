@@ -22,6 +22,8 @@ func etapasDoSistema() []Etapa {
 
 func unidadesFixas() []string { return nil }
 
+func unidadesParaVarrer() []string { return nil }
+
 func preencherPerfis(c *Contexto) {}
 
 func buscaLivre(c *Contexto, termo string) ResultadoBuscaLivre {
